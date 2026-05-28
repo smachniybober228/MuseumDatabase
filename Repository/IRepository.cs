@@ -1,4 +1,4 @@
-﻿namespace Museum
+﻿namespace Museum.Repository
 {
     public interface IRepository<T> where T : class
     {

@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Museum.Models;
+using Museum.Repository;
 using System.Collections.ObjectModel;
 
 namespace Museum.ViewModels
