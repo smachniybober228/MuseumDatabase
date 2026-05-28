@@ -4,13 +4,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Museum.Models;
 
-public partial class БоборContext : DbContext
+public partial class MuseumDbContext : DbContext
 {
-    public БоборContext()
+    public MuseumDbContext()
     {
     }
 
-    public БоборContext(DbContextOptions<БоборContext> options)
+    public MuseumDbContext(DbContextOptions<MuseumDbContext> options)
         : base(options)
     {
     }

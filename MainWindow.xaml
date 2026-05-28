@@ -4,9 +4,30 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Museum"
+        xmlns:views="clr-namespace:Museum.Views"
+        xmlns:vm="clr-namespace:Museum.ViewModels"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Музеи и реставрационные мастерские" Height="450" Width="800">
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
     <Grid>
-
+        <TabControl>
+            <TabItem Header="Экспонаты">
+                <views:Exhibits/>
+            </TabItem>
+            <TabItem Header="Выставки">
+                <views:Exhibitions/>
+            </TabItem>
+            <TabItem Header="Реставрация">
+                <views:Restoration/>
+            </TabItem>
+            <TabItem Header="Продажа билетов">
+                <views:TicketSales/>
+            </TabItem>
+            <TabItem Header="Отчёты">
+                <views:Reports/>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
