@@ -45,7 +45,14 @@ namespace Museum.ViewModels
         [RelayCommand]
         private async Task AddExhibitAsync()
         {
-            // ... 
+            var newExhibit = new Exhibit();
+            var dialog = new ExhibitEditWindow(newExhibit, _statusRepository, _receiptActRepository);
+            if (dialog.ShowDialog() == true)
+            {
+                await _exhibitRepository.AddAsync(dialog.EditedExhibit);
+                await _exhibitRepository.SaveAsync();
+                await LoadExhibitsAsync();
+            }
         }
 
         [RelayCommand]
