@@ -1,5 +1,7 @@
-﻿using System.Windows.Controls;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Museum.ViewModels;
+using System.Windows;
+using System.Windows.Controls;
 
 namespace Museum.Views
 {
@@ -8,13 +10,10 @@ namespace Museum.Views
     /// </summary>
     public partial class Exhibits : UserControl
     {
-        private readonly ExhibitsViewModel viewModel;
         public Exhibits()
         {
             InitializeComponent();
-
-            viewModel = new ExhibitsViewModel();
-            DataContext = viewModel;
+            DataContext = App.ServiceProvider.GetRequiredService<ExhibitsViewModel>();
         }
     }
 }

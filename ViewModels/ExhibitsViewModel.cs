@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Museum.Models;
 using Museum.Repository;
+using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
 
@@ -12,37 +13,33 @@ namespace Museum.ViewModels
         private readonly IRepository<Exhibit> _exhibitRepository;
 
         [ObservableProperty]
-        private ObservableCollection<Exhibit> exhibits;
+        private ObservableCollection<Exhibit> _exhibits;
 
         [ObservableProperty]
-        private Exhibit selectedExhibit;
+        private Exhibit _selectedExhibit;
 
         [ObservableProperty]
-        private bool isLoading;
+        private bool _isLoading;
 
         public ExhibitsViewModel(IRepository<Exhibit> exhibitRepository)
         {
             _exhibitRepository = exhibitRepository;
-            // Загружаем данные при создании ViewModel
-            Task.Run(async () => await LoadExhibitsAsync());
+            LoadExhibitsAsync();
         }
 
         [RelayCommand]
         private async Task LoadExhibitsAsync()
         {
-            isLoading = true;
+            IsLoading = true;
             var list = await _exhibitRepository.GetAllAsync();
             Exhibits = new ObservableCollection<Exhibit>(list);
-            isLoading = false;
+            IsLoading = false;
         }
 
         [RelayCommand]
         private async Task AddExhibitAsync()
         {
-            // Открыть диалог создания нового экспоната
-            // var dialogVM = new ExhibitDialogViewModel(null, null, null); // упрощённо, нужны репозитории
-            // ... логика показа диалога
-            // После сохранения: await LoadExhibitsAsync();
+            // ... 
         }
 
         [RelayCommand]
@@ -53,8 +50,7 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите экспонат для редактирования.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            // Открыть диалог редактирования SelectedExhibit
-            // После сохранения: await LoadExhibitsAsync();
+            // ...
         }
 
         [RelayCommand]

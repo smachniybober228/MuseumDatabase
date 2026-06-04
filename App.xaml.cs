@@ -21,20 +21,17 @@ namespace Museum
 
             // Регистрация DbContext
             services.AddDbContext<MuseumDbContext>(options =>
-                options.UseSqlServer("YourConnectionString"));
+                options.UseSqlServer("Server=DBSRV\\vip2025;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"));
 
-            // Регистрация обобщённого репозитория
+            // Репозитории (обобщённый)
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
-            // Регистрация ViewModel и View
+            // ViewModels
+            services.AddTransient<MainViewModel>();
             services.AddTransient<ExhibitsViewModel>();
-            services.AddTransient<Exhibits>();
-            // ... остальные
 
             ServiceProvider = services.BuildServiceProvider();
 
-            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
             base.OnStartup(e);
         }
     }
