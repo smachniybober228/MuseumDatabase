@@ -28,7 +28,7 @@
                   ItemsSource="{Binding Exhibits}" 
                   SelectedItem="{Binding SelectedExhibit}"
                   AutoGenerateColumns="True" 
-                  IsReadOnly="False"
+                  IsReadOnly="True"
                   CanUserAddRows="False"
                   SelectionMode="Single"/>
 
