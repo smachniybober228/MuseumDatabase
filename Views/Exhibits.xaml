@@ -28,8 +28,9 @@
                   ItemsSource="{Binding Exhibits}" 
                   SelectedItem="{Binding SelectedExhibit}"
                   AutoGenerateColumns="True" 
-                  IsReadOnly="True"
-                  CanUserAddRows="False"/>
+                  IsReadOnly="False"
+                  CanUserAddRows="False"
+                  SelectionMode="Single"/>
 
         <Border Grid.Row="1" 
                 Background="White" 

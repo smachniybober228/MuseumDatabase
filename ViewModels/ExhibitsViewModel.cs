@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Museum.Models;
 using Museum.Repository;
-using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
 
@@ -58,11 +57,11 @@ namespace Museum.ViewModels
         {
             if (SelectedExhibit == null)
             {
-                MessageBox.Show("Выберите экспонат для удаления.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Выберите экспонат для удаления.", "Предупреждение");
                 return;
             }
-
-            if (MessageBox.Show($"Удалить экспонат '{SelectedExhibit.Title}'?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (MessageBox.Show($"Удалить экспонат '{SelectedExhibit.Title}'? Все связанные данные (фото, категории, заказы и т.д.) будут удалены автоматически.",
+                        "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
                 _exhibitRepository.Delete(SelectedExhibit);
                 await _exhibitRepository.SaveAsync();
