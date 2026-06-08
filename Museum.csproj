@@ -26,4 +26,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.16" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="SQL\CreateDB.sql">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
+  </ItemGroup>
+
 </Project>

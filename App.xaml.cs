@@ -21,7 +21,8 @@ namespace Museum
 
             // Регистрация DbContext
             services.AddDbContext<MuseumDbContext>(options =>
-                options.UseSqlServer("Server=DBSRV\\vip2025;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"));
+                options.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"));
+            // Для работы в колледже: "Server=DBSRV\\vip2025;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"
 
             // Репозитории (обобщённый)
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
