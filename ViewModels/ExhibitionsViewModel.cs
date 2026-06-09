@@ -59,7 +59,11 @@ namespace Museum.ViewModels
         [RelayCommand]
         private async Task AddExhibitionAsync()
         {
-            var newExhibition = new Exhibition();
+            var newExhibition = new Exhibition
+            {
+                StartDate = DateTime.Today,
+                EndDate = DateTime.Today.AddMonths(1)
+            };
             var halls = await _hallRepo.GetAllAsync();
             var curators = await _personRepo.GetAllAsync();
             var statuses = await _statusRepo.GetAllAsync();
