@@ -1,12 +1,20 @@
 ﻿<UserControl x:Class="Museum.Views.Exhibitions"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Museum.Views"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-    <Grid>
-            
+             xmlns:vm="clr-namespace:Museum.ViewModels">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="Добавить" Command="{Binding AddExhibitionCommand}" Margin="0,0,5,0"/>
+            <Button Content="Редактировать" Command="{Binding EditExhibitionCommand}" Margin="0,0,5,0"/>
+            <Button Content="Удалить" Command="{Binding DeleteExhibitionCommand}" Margin="0,0,5,0"/>
+            <Button Content="Экспонаты" Command="{Binding ManageExhibitsCommand}" Margin="0,0,5,0"/>
+            <Button Content="Обновить" Command="{Binding LoadExhibitionsCommand}"/>
+        </StackPanel>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Exhibitions}" SelectedItem="{Binding SelectedExhibition}" 
+                  AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"/>
     </Grid>
 </UserControl>
