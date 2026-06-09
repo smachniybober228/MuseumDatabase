@@ -41,6 +41,8 @@ namespace Museum
             services.AddScoped<IRepository<Ticket>, Repository<Ticket>>();
             services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
             services.AddScoped<IRepository<TicketStatus>, Repository<TicketStatus>>();
+            services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
+            services.AddScoped<IRepository<Exhibit>, Repository<Exhibit>>();
 
             // ViewModels
             services.AddTransient<MainViewModel>();
@@ -48,12 +50,14 @@ namespace Museum
             services.AddTransient<ExhibitionsViewModel>();
             services.AddTransient<RestorationViewModel>();
             services.AddTransient<TicketSalesViewModel>();
+            services.AddTransient<ReportsViewModel>();
 
             // Views
             services.AddTransient<Exhibits>();
             services.AddTransient<Exhibitions>();
             services.AddTransient<Restoration>();
             services.AddTransient<TicketSales>();
+            services.AddTransient<Reports>();
 
             ServiceProvider = services.BuildServiceProvider();
 

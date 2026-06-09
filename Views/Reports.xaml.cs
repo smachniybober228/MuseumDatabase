@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Museum.ViewModels;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,6 +25,7 @@ namespace Museum.Views
         public Reports()
         {
             InitializeComponent();
+            DataContext = App.ServiceProvider.GetRequiredService<ReportsViewModel>();
         }
     }
 }
