@@ -40,12 +40,14 @@ namespace Museum.ViewModels
             _ticketRepo = ticketRepo;
             _exhibitionRepo = exhibitionRepo;
             _ticketStatusRepo = ticketStatusRepo;
-            LoadExhibitionsAsync();
         }
 
-        private async Task LoadExhibitionsAsync()
+        internal async Task LoadExhibitionsAsync()
         {
             var list = await _exhibitionRepo.GetAllAsync();
+            System.Diagnostics.Debug.WriteLine($"Загружено выставок: {list.Count()}");
+            foreach (var ex in list)
+                System.Diagnostics.Debug.WriteLine($"  {ex.Id} - {ex.Title}");
             Exhibitions = new ObservableCollection<Exhibition>(list);
         }
 

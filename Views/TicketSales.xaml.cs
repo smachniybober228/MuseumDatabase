@@ -12,6 +12,7 @@ namespace Museum.Views
             InitializeComponent();
             _viewModel = App.ServiceProvider.GetRequiredService<TicketSalesViewModel>();
             DataContext = _viewModel;
+            Loaded += async (s, e) => await _viewModel.LoadExhibitionsAsync();
         }
 
         private async void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
