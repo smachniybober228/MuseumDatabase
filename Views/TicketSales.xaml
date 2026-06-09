@@ -37,7 +37,7 @@
                         <DataGridTextColumn Header="Дата продажи" Binding="{Binding SaleDateTime, StringFormat=dd.MM.yyyy HH:mm}" Width="150"/>
                         <DataGridTextColumn Header="Дата посещения" Binding="{Binding VisitDate, StringFormat=dd.MM.yyyy}" Width="120"/>
                         <DataGridTextColumn Header="Цена" Binding="{Binding SalePrice}" Width="80"/>
-                        <DataGridTextColumn Header="Статус" Binding="{Binding TicketStatus.Title}" Width="120"/>
+                        <DataGridTextColumn Header="Статус" Binding="{Binding TicketStatusFkNavigation.Title}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
                 <Button Content="Отметить как использованный" Command="{Binding UseTicketCommand}" 
