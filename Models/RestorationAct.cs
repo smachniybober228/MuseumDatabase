@@ -7,7 +7,7 @@ public partial class RestorationAct
 {
     public int Id { get; set; }
 
-    public DateOnly CompletionDate { get; set; }
+    public DateTime CompletionDate { get; set; }
 
     public string FinalReport { get; set; } = null!;
 

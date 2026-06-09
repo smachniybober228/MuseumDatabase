@@ -7,7 +7,7 @@ public partial class ReturnAct
 {
     public int Id { get; set; }
 
-    public DateOnly ReturnDate { get; set; }
+    public DateTime ReturnDate { get; set; }
 
     public int RestorationOrderFk { get; set; }
 

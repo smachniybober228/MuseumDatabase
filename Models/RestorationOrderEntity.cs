@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Museum.Models;
 
@@ -9,11 +10,11 @@ public partial class RestorationOrderEntity
 
     public string OrderNumber { get; set; } = null!;
 
-    public DateOnly ReceiptDate { get; set; }
+    public DateTime ReceiptDate { get; set; }
 
     public string ReasonDirection { get; set; } = null!;
 
-    public DateOnly PlannedCompletionDate { get; set; }
+    public DateTime PlannedCompletionDate { get; set; }
 
     public int ExhibitFk { get; set; }
 
@@ -34,4 +35,7 @@ public partial class RestorationOrderEntity
     public virtual ICollection<ReturnAct> ReturnActs { get; set; } = new List<ReturnAct>();
 
     public virtual ICollection<WorkLogEntry> WorkLogEntries { get; set; } = new List<WorkLogEntry>();
+
+    [NotMapped]
+    public string StatusText { get; set; }
 }

@@ -32,14 +32,23 @@ namespace Museum
             services.AddScoped<IRepository<ExhibitionStatus>, Repository<ExhibitionStatus>>();
             services.AddScoped<IRepository<ExpositionPlaceType>, Repository<ExpositionPlaceType>>();
             services.AddScoped<IRepository<ExhibitOnExhibition>, Repository<ExhibitOnExhibition>>();
+            services.AddScoped<IRepository<RestorationOrderEntity>, Repository<RestorationOrderEntity>>();
+            services.AddScoped<IRepository<RestorationWorkType>, Repository<RestorationWorkType>>();
+            services.AddScoped<IRepository<RequiredWorkType>, Repository<RequiredWorkType>>();
+            services.AddScoped<IRepository<WorkLogEntry>, Repository<WorkLogEntry>>();
+            services.AddScoped<IRepository<RestorationAct>, Repository<RestorationAct>>();
+            services.AddScoped<IRepository<ReturnAct>, Repository<ReturnAct>>();
 
             // ViewModels
             services.AddTransient<MainViewModel>();
             services.AddTransient<ExhibitsViewModel>();
             services.AddTransient<ExhibitionsViewModel>();
+            services.AddTransient<RestorationViewModel>();
 
+            // Views
             services.AddTransient<Exhibits>();
             services.AddTransient<Exhibitions>();
+            services.AddTransient<Restoration>();
 
             ServiceProvider = services.BuildServiceProvider();
 

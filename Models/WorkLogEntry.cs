@@ -7,7 +7,7 @@ public partial class WorkLogEntry
 {
     public int Id { get; set; }
 
-    public DateOnly ExecutionDate { get; set; }
+    public DateTime ExecutionDate { get; set; }
 
     public int RestorationOrderFk { get; set; }
 
