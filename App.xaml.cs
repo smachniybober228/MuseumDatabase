@@ -38,17 +38,22 @@ namespace Museum
             services.AddScoped<IRepository<WorkLogEntry>, Repository<WorkLogEntry>>();
             services.AddScoped<IRepository<RestorationAct>, Repository<RestorationAct>>();
             services.AddScoped<IRepository<ReturnAct>, Repository<ReturnAct>>();
+            services.AddScoped<IRepository<Ticket>, Repository<Ticket>>();
+            services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
+            services.AddScoped<IRepository<TicketStatus>, Repository<TicketStatus>>();
 
             // ViewModels
             services.AddTransient<MainViewModel>();
             services.AddTransient<ExhibitsViewModel>();
             services.AddTransient<ExhibitionsViewModel>();
             services.AddTransient<RestorationViewModel>();
+            services.AddTransient<TicketSalesViewModel>();
 
             // Views
             services.AddTransient<Exhibits>();
             services.AddTransient<Exhibitions>();
             services.AddTransient<Restoration>();
+            services.AddTransient<TicketSales>();
 
             ServiceProvider = services.BuildServiceProvider();
 

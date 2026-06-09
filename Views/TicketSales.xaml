@@ -1,12 +1,48 @@
 ﻿<UserControl x:Class="Museum.Views.TicketSales"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Museum.Views"
-             mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
-    <Grid>
-            
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Выбор выставки -->
+        <GroupBox Header="Выберите выставку" Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal">
+                <ComboBox ItemsSource="{Binding Exhibitions}" DisplayMemberPath="Title"
+                          SelectedItem="{Binding SelectedExhibition}" Width="250" Margin="5"
+                          SelectionChanged="ComboBox_SelectionChanged"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Продажа билета -->
+        <GroupBox Header="Продажа билета" Grid.Row="1" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" Margin="5">
+                <DatePicker SelectedDate="{Binding VisitDate}" Width="120" Margin="0,0,10,0"/>
+                <TextBox Text="{Binding SalePrice}" Width="80" Margin="0,0,10,0"/>
+                <Button Content="Продать билет" Command="{Binding SellTicketCommand}" Width="100"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Список билетов -->
+        <GroupBox Header="Проданные билеты" Grid.Row="2">
+            <Grid>
+                <DataGrid ItemsSource="{Binding TicketsForSelectedExhibition}" 
+                          SelectedItem="{Binding SelectedTicket}"
+                          AutoGenerateColumns="False" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="№ билета" Binding="{Binding TicketNumber}" Width="120"/>
+                        <DataGridTextColumn Header="Дата продажи" Binding="{Binding SaleDateTime, StringFormat=dd.MM.yyyy HH:mm}" Width="150"/>
+                        <DataGridTextColumn Header="Дата посещения" Binding="{Binding VisitDate, StringFormat=dd.MM.yyyy}" Width="120"/>
+                        <DataGridTextColumn Header="Цена" Binding="{Binding SalePrice}" Width="80"/>
+                        <DataGridTextColumn Header="Статус" Binding="{Binding TicketStatus.Title}" Width="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Button Content="Отметить как использованный" Command="{Binding UseTicketCommand}" 
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" Width="180"/>
+            </Grid>
+        </GroupBox>
     </Grid>
 </UserControl>

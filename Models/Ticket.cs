@@ -13,7 +13,7 @@ public partial class Ticket
 
     public double SalePrice { get; set; }
 
-    public DateOnly VisitDate { get; set; }
+    public DateTime VisitDate { get; set; }
 
     public int ExhibitionFk { get; set; }
 

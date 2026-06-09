@@ -9,7 +9,7 @@ namespace Museum.Services
 
         public ReportService(MuseumDbContext context) => _context = context;
 
-        public async Task<List<ExhibitionAttendanceDto>> GetExhibitionAttendanceReport(DateOnly start, DateOnly end)
+        public async Task<List<ExhibitionAttendanceDto>> GetExhibitionAttendanceReport(DateTime start, DateTime end)
         {
             var query = from t in _context.Tickets
                         where t.VisitDate >= start && t.VisitDate <= end
