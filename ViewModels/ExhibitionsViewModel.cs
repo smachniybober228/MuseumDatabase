@@ -144,35 +144,40 @@ namespace Museum.ViewModels
                 return;
             }
 
-            // Загружаем все экспонаты, которые уже на этой выставке (с доп. полями)
-            var exhibitOnExhibitions = await _exhibitOnExhibitionRepo.GetAllAsync();
-            var currentLinks = exhibitOnExhibitions.Where(e => e.ExhibitionFk == SelectedExhibition.Id).ToList();
+            // Загружаем все существующие связи для этой выставки (без трекинга, чтобы избежать конфликтов)
+            var allLinks = await _exhibitOnExhibitionRepo.GetAllAsync();
+            var existingLinks = allLinks.Where(l => l.ExhibitionFk == SelectedExhibition.Id).ToList();
 
-            var availableExhibits = await _exhibitRepo.GetAllAsync();
-            // Фильтруем экспонаты, которые не на реставрации и не списаны, и не заняты на других активных выставках (упростим)
-            // Для простоты показываем все экспонаты, кроме уже добавленных
-
+            var allExhibits = await _exhibitRepo.GetAllAsync();
             var placeTypes = await _placeTypeRepo.GetAllAsync();
 
-            var dialog = new ExhibitSelectionWindow(SelectedExhibition, currentLinks, availableExhibits.ToList(), placeTypes.ToList());
+            var dialog = new ExhibitSelectionWindow(SelectedExhibition, existingLinks, allExhibits.ToList(), placeTypes.ToList());
             if (dialog.ShowDialog() == true)
             {
-                // Здесь нужно синхронизировать связи: удалить отсутствующие, добавить новые, обновить поля
-                // Но для упрощения пересоздадим все связи для этой выставки (предварительно удалив старые)
-                var toDelete = exhibitOnExhibitions.Where(e => e.ExhibitionFk == SelectedExhibition.Id).ToList();
-                foreach (var link in toDelete)
-                    _exhibitOnExhibitionRepo.Delete(link);
-
-                foreach (var link in dialog.UpdatedLinks)
+                // Удаляем все существующие связи для этой выставки (если они есть)
+                foreach (var link in existingLinks)
                 {
-                    await _exhibitOnExhibitionRepo.AddAsync(link);
+                    _exhibitOnExhibitionRepo.Delete(link);
                 }
                 await _exhibitOnExhibitionRepo.SaveAsync();
 
-                // Обновить статусы экспонатов: изменить на "На временной выставке" для добавленных
-                // и вернуть исходный для удалённых (логику можно добавить позже)
-                await LoadExhibitionsAsync();
+                // Добавляем новые связи из диалога
+                foreach (var link in dialog.UpdatedLinks)
+                {
+                    var newLink = new ExhibitOnExhibition
+                    {
+                        ExhibitionFk = SelectedExhibition.Id,
+                        ExhibitFk = link.ExhibitFk,
+                        ExpositionPlaceTypeFk = link.ExpositionPlaceTypeFk,
+                        PlaceIdentifier = link.PlaceIdentifier,
+                        LabelData = link.LabelData
+                    };
+                    await _exhibitOnExhibitionRepo.AddAsync(newLink);
+                }
+                await _exhibitOnExhibitionRepo.SaveAsync();
+
                 MessageBox.Show("Состав выставки обновлён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadExhibitionsAsync();
             }
         }
     }

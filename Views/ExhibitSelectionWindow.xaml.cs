@@ -1,53 +1,69 @@
 ﻿using Museum.Models;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace Museum.Views
 {
     public partial class ExhibitSelectionWindow : Window
     {
+        private readonly int _exhibitionId;
+        private readonly Dictionary<int, Exhibit> _allExhibitsDict;
+
         public ObservableCollection<Exhibit> AvailableExhibits { get; set; }
         public ObservableCollection<ExhibitOnExhibition> AddedLinks { get; set; }
-        public List<ExpositionPlaceType> PlaceTypes { get; set; }
+        public ObservableCollection<ExpositionPlaceType> PlaceTypes { get; set; }
 
         public Exhibit SelectedAvailableExhibit { get; set; }
 
-        public ExhibitSelectionWindow(Exhibition exhibition, List<ExhibitOnExhibition> existingLinks, List<Exhibit> allExhibits, List<ExpositionPlaceType> placeTypes)
+        public ExhibitSelectionWindow(Exhibition exhibition,
+                                      List<ExhibitOnExhibition> existingLinks,
+                                      List<Exhibit> allExhibits,
+                                      List<ExpositionPlaceType> placeTypes)
         {
             InitializeComponent();
-            PlaceTypes = placeTypes;
-            // Доступные – те, которые не в existingLinks
+
+            _exhibitionId = exhibition.Id;
+            _allExhibitsDict = allExhibits.ToDictionary(e => e.Id);
+
+            PlaceTypes = new ObservableCollection<ExpositionPlaceType>(placeTypes);
             var existingExhibitIds = existingLinks.Select(l => l.ExhibitFk).ToHashSet();
             AvailableExhibits = new ObservableCollection<Exhibit>(allExhibits.Where(e => !existingExhibitIds.Contains(e.Id)));
             AddedLinks = new ObservableCollection<ExhibitOnExhibition>(existingLinks);
+
             DataContext = this;
         }
 
-        private void AddExhibitCommand(object sender, RoutedEventArgs e)
+        private void AddExhibit_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedAvailableExhibit != null)
             {
                 var newLink = new ExhibitOnExhibition
                 {
-                    ExhibitionFk = 0, // заполнится при сохранении
+                    ExhibitionFk = _exhibitionId,           // правильный Id выставки
                     ExhibitFk = SelectedAvailableExhibit.Id,
                     ExpositionPlaceTypeFk = PlaceTypes.FirstOrDefault()?.Id ?? 0,
                     PlaceIdentifier = "",
-                    LabelData = ""
+                    LabelData = "",
+                    ExhibitFkNavigation = SelectedAvailableExhibit      // для отображения
                 };
                 AddedLinks.Add(newLink);
                 AvailableExhibits.Remove(SelectedAvailableExhibit);
             }
         }
 
-        private void RemoveExhibitCommand(object sender, RoutedEventArgs e)
+        private void RemoveExhibit_Click(object sender, RoutedEventArgs e)
         {
-            var selected = (ExhibitOnExhibition)((dynamic)sender).DataContext; // упрощённо, нужна привязка
-            if (selected != null)
+            var button = sender as Button;
+            if (button?.DataContext is ExhibitOnExhibition selectedLink)
             {
-                var exhibit = new Exhibit { Id = selected.ExhibitFk, Title = "..." }; // нужно восстановить из БД
-                AvailableExhibits.Add(exhibit);
-                AddedLinks.Remove(selected);
+                // Восстанавливаем полный экспонат из словаря
+                if (_allExhibitsDict.TryGetValue(selectedLink.ExhibitFk, out var fullExhibit))
+                {
+                    AvailableExhibits.Add(fullExhibit);
+                }
+                AddedLinks.Remove(selectedLink);
             }
         }
 
