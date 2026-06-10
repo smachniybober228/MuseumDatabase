@@ -9,7 +9,9 @@ namespace Museum.Views
         public People()
         {
             InitializeComponent();
-            DataContext = App.ServiceProvider.GetRequiredService<PeopleViewModel>();
+            var vm = App.ServiceProvider.GetRequiredService<PeopleViewModel>();
+            DataContext = vm;
+            Loaded += async (s, e) => await vm.LoadPeopleAsync();
         }
     }
 }

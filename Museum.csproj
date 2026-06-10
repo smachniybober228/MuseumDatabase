@@ -33,6 +33,9 @@
     <None Update="SQL\CreateDB.sql">
       <Generator>MSBuild:Compile</Generator>
     </None>
+    <None Update="SQL\Fk.sql">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
   </ItemGroup>
 
 </Project>
