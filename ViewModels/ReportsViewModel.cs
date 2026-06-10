@@ -35,7 +35,7 @@ namespace Museum.ViewModels
         private ObservableCollection<AttendanceReportRow> _attendanceReportRows;
 
         [ObservableProperty]
-        private ObservableCollection<Exhibit> _restorationExhibits;
+        private ObservableCollection<RestorationOrderEntity> _restorationOrders;
 
         [ObservableProperty]
         private ObservableCollection<Exhibit> _allExhibits;
@@ -64,10 +64,25 @@ namespace Museum.ViewModels
             _contextFactory = contextFactory;
         }
 
-        public async Task LoadExhibitionsAsync()
+        [RelayCommand]
+        internal async Task LoadRestorationOrdersAsync()
         {
-            var list = await _exhibitionRepo.GetAllAsync();
-            Exhibitions = new ObservableCollection<Exhibition>(list);
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var orders = await context.RestorationOrderEntities
+                .Include(o => o.ExhibitFkNavigation)
+                .Include(o => o.RestorerFkNavigation)
+                .Include(o => o.RequiredWorkTypes)
+                    .ThenInclude(r => r.WorkTypeFkNavigation)
+                .Where(o => !o.RestorationActs.Any()) // только активные заказы (нет акта завершения)
+                .ToListAsync();
+
+            // Вычисляем статус (опционально)
+            foreach (var order in orders)
+            {
+                order.StatusText = "В работе";
+            }
+
+            RestorationOrders = new ObservableCollection<RestorationOrderEntity>(orders);
         }
 
         public async Task LoadAllExhibitsAsync()
@@ -105,24 +120,6 @@ namespace Museum.ViewModels
         }
 
         [RelayCommand]
-        internal async Task LoadRestorationExhibitsAsync()
-        {
-            var allOrders = await _orderRepo.GetAllAsync();
-            var allActs = await _restorationActRepo.GetAllAsync();
-            var allReturns = await _returnActRepo.GetAllAsync();
-
-            // Экспонаты, у которых есть заказ, но нет акта завершения (в работе)
-            var activeOrderExhibitIds = allOrders
-                .Where(o => !allActs.Any(a => a.RestorationOrderFk == o.Id))
-                .Select(o => o.ExhibitFk)
-                .Distinct();
-
-            var exhibits = await _exhibitRepo.GetAllAsync();
-            var restorationExhibits = exhibits.Where(e => activeOrderExhibitIds.Contains(e.Id)).ToList();
-            RestorationExhibits = new ObservableCollection<Exhibit>(restorationExhibits);
-        }
-
-        [RelayCommand]
         private async Task LoadRestorationHistory()
         {
             if (SelectedExhibitForHistory == null)
@@ -155,6 +152,14 @@ namespace Museum.ViewModels
             }
 
             RestorationHistoryRows = new ObservableCollection<RestorationHistoryRow>(history);
+        }
+
+        [RelayCommand]
+        public async Task LoadExhibitionsAsync()
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var list = await context.Exhibitions.ToListAsync();
+            Exhibitions = new ObservableCollection<Exhibition>(list);
         }
     }
 

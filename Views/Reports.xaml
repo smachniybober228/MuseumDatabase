@@ -19,21 +19,32 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Выставка" Binding="{Binding ExhibitionTitle}" Width="200"/>
                         <DataGridTextColumn Header="Посетителей" Binding="{Binding VisitorsCount}" Width="100"/>
-                        <DataGridTextColumn Header="Выручка" Binding="{Binding Revenue, StringFormat=C}" Width="120"/>
+                        <DataGridTextColumn Header="Выручка" Binding="{Binding Revenue, StringFormat=N2}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
         </TabItem>
 
-        <!-- Отчёт 2: Экспонаты на реставрации -->
+        <!-- Отчёт 2: Экспонаты на реставрации (активные заказы) -->
         <TabItem Header="Экспонаты на реставрации">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Button Content="Обновить" Command="{Binding LoadRestorationExhibitsCommand}" Width="100" Margin="0,0,0,10"/>
-                <DataGrid Grid.Row="1" ItemsSource="{Binding RestorationExhibits}" AutoGenerateColumns="True" IsReadOnly="True"/>
+                <Button Content="Обновить" Command="{Binding LoadRestorationOrdersCommand}" Width="100" Margin="0,0,0,10"/>
+                <DataGrid Grid.Row="1" ItemsSource="{Binding RestorationOrders}" 
+                  AutoGenerateColumns="False" IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Экспонат" Binding="{Binding ExhibitFkNavigation.Title}" Width="200"/>
+                        <DataGridTextColumn Header="Инв. номер" Binding="{Binding ExhibitFkNavigation.InventoryNumber}" Width="100"/>
+                        <DataGridTextColumn Header="Дата приёма" Binding="{Binding ReceiptDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                        <DataGridTextColumn Header="Плановая дата" Binding="{Binding PlannedCompletionDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                        <DataGridTextColumn Header="Реставратор" Binding="{Binding RestorerFkNavigation.FullName}" Width="150"/>
+                        <DataGridTextColumn Header="Требуемые работы" Binding="{Binding RequiredWorksString}" Width="200"/>
+                        <DataGridTextColumn Header="Статус" Binding="{Binding StatusText}" Width="150"/>
+                    </DataGrid.Columns>
+                </DataGrid>
             </Grid>
         </TabItem>
 

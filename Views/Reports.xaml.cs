@@ -18,7 +18,7 @@ namespace Museum.Views
             {
                 await vm.LoadExhibitionsAsync();
                 await vm.LoadAllExhibitsAsync();
-                await vm.LoadRestorationExhibitsAsync();
+                await vm.LoadRestorationOrdersAsync(); // новая загрузка
             };
         }
     }
