@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.EntityFrameworkCore;
 using Museum.Models;
 using Museum.Repository;
 using System.Collections.ObjectModel;
@@ -10,35 +9,30 @@ namespace Museum.ViewModels
 {
     public partial class ReportsViewModel : ObservableObject
     {
-        private readonly IRepository<Exhibition> _exhibitionRepo;
         private readonly IRepository<Ticket> _ticketRepo;
+        private readonly IRepository<Exhibition> _exhibitionRepo;
         private readonly IRepository<RestorationOrderEntity> _orderRepo;
-        private readonly IRepository<RestorationAct> _actRepo;
-        private readonly IRepository<ReturnAct> _returnRepo;
         private readonly IRepository<Exhibit> _exhibitRepo;
-        private readonly IRepository<WorkLogEntry> _workLogRepo;
-        private readonly IRepository<RestorationWorkType> _workTypeRepo;
+        private readonly IRepository<RestorationAct> _restorationActRepo;
+        private readonly IRepository<ReturnAct> _returnActRepo;
 
         [ObservableProperty]
         private ObservableCollection<Exhibition> _exhibitions;
 
         [ObservableProperty]
-        private Exhibition _selectedExhibitionForDaily;
+        private Exhibition _selectedExhibitionForAttendance;
 
         [ObservableProperty]
-        private DateTime _reportStartDate = DateTime.Today.AddMonths(-1);
+        private DateTime _startDate = DateTime.Today.AddMonths(-1);
 
         [ObservableProperty]
-        private DateTime _reportEndDate = DateTime.Today;
+        private DateTime _endDate = DateTime.Today;
 
         [ObservableProperty]
-        private ObservableCollection<ExhibitionAttendanceDto> _attendanceReport;
+        private ObservableCollection<AttendanceReportRow> _attendanceReportRows;
 
         [ObservableProperty]
-        private ObservableCollection<DailyAttendanceDto> _dailyAttendanceReport;
-
-        [ObservableProperty]
-        private ObservableCollection<RestorationExhibitDto> _restorationExhibits;
+        private ObservableCollection<Exhibit> _restorationExhibits;
 
         [ObservableProperty]
         private ObservableCollection<Exhibit> _allExhibits;
@@ -47,38 +41,31 @@ namespace Museum.ViewModels
         private Exhibit _selectedExhibitForHistory;
 
         [ObservableProperty]
-        private ObservableCollection<RestorationHistoryDto> _restorationHistory;
+        private ObservableCollection<RestorationHistoryRow> _restorationHistoryRows;
 
         public ReportsViewModel(
-            IRepository<Exhibition> exhibitionRepo,
             IRepository<Ticket> ticketRepo,
+            IRepository<Exhibition> exhibitionRepo,
             IRepository<RestorationOrderEntity> orderRepo,
-            IRepository<RestorationAct> actRepo,
-            IRepository<ReturnAct> returnRepo,
             IRepository<Exhibit> exhibitRepo,
-            IRepository<WorkLogEntry> workLogRepo,
-            IRepository<RestorationWorkType> workTypeRepo)
+            IRepository<RestorationAct> restorationActRepo,
+            IRepository<ReturnAct> returnActRepo)
         {
-            _exhibitionRepo = exhibitionRepo;
             _ticketRepo = ticketRepo;
+            _exhibitionRepo = exhibitionRepo;
             _orderRepo = orderRepo;
-            _actRepo = actRepo;
-            _returnRepo = returnRepo;
             _exhibitRepo = exhibitRepo;
-            _workLogRepo = workLogRepo;
-            _workTypeRepo = workTypeRepo;
-
-            LoadExhibitionsAsync();
-            LoadAllExhibitsAsync();
+            _restorationActRepo = restorationActRepo;
+            _returnActRepo = returnActRepo;
         }
 
-        private async Task LoadExhibitionsAsync()
+        public async Task LoadExhibitionsAsync()
         {
             var list = await _exhibitionRepo.GetAllAsync();
             Exhibitions = new ObservableCollection<Exhibition>(list);
         }
 
-        private async Task LoadAllExhibitsAsync()
+        public async Task LoadAllExhibitsAsync()
         {
             var list = await _exhibitRepo.GetAllAsync();
             AllExhibits = new ObservableCollection<Exhibit>(list);
@@ -87,106 +74,92 @@ namespace Museum.ViewModels
         [RelayCommand]
         private async Task GenerateAttendanceReport()
         {
-            var allTickets = await _ticketRepo.GetAllAsync();
-            var usedTickets = allTickets.Where(t => t.VisitDate >= ReportStartDate && t.VisitDate <= ReportEndDate
-                                                 && t.TicketStatusFkNavigation?.Title == "Использован");
-            var query = usedTickets.GroupBy(t => t.ExhibitionFkNavigation.Title)
-                                   .Select(g => new ExhibitionAttendanceDto
-                                   {
-                                       ExhibitionTitle = g.Key,
-                                       VisitorsCount = g.Count(),
-                                       Revenue = g.Sum(x => x.SalePrice)
-                                   });
-            AttendanceReport = new ObservableCollection<ExhibitionAttendanceDto>(query);
-        }
-
-        [RelayCommand]
-        private async Task GenerateDailyAttendance()
-        {
-            if (SelectedExhibitionForDaily == null)
+            if (StartDate > EndDate)
             {
-                MessageBox.Show("Выберите выставку.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Дата начала не может быть позже даты окончания.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
             var allTickets = await _ticketRepo.GetAllAsync();
-            var tickets = allTickets.Where(t => t.ExhibitionFk == SelectedExhibitionForDaily.Id
-                                             && t.VisitDate >= ReportStartDate && t.VisitDate <= ReportEndDate
-                                             && t.TicketStatusFkNavigation?.Title == "Использован");
-            var query = tickets.GroupBy(t => t.VisitDate)
-                               .Select(g => new DailyAttendanceDto
-                               {
-                                   VisitDate = g.Key,
-                                   VisitorsCount = g.Count()
-                               })
-                               .OrderBy(d => d.VisitDate);
-            DailyAttendanceReport = new ObservableCollection<DailyAttendanceDto>(query);
+            var usedTickets = allTickets.Where(t => t.TicketStatusFkNavigation?.Title == "Использован" && t.VisitDate >= StartDate && t.VisitDate <= EndDate);
+            var grouped = usedTickets.GroupBy(t => t.ExhibitionFkNavigation).Select(g => new AttendanceReportRow
+            {
+                ExhibitionTitle = g.Key?.Title ?? "Неизвестная выставка",
+                VisitorsCount = g.Count(),
+                Revenue = g.Sum(t => t.SalePrice)
+            }).ToList();
+
+            AttendanceReportRows = new ObservableCollection<AttendanceReportRow>(grouped);
         }
 
         [RelayCommand]
-        private async Task GenerateRestorationExhibitsReport()
+        internal async Task LoadRestorationExhibitsAsync()
         {
             var allOrders = await _orderRepo.GetAllAsync();
-            var allActs = await _actRepo.GetAllAsync();
-            var allReturns = await _returnRepo.GetAllAsync();
-            var allExhibits = await _exhibitRepo.GetAllAsync();
+            var allActs = await _restorationActRepo.GetAllAsync();
+            var allReturns = await _returnActRepo.GetAllAsync();
 
-            var result = new List<RestorationExhibitDto>();
-            foreach (var order in allOrders)
-            {
-                bool hasAct = allActs.Any(a => a.RestorationOrderFk == order.Id);
-                bool hasReturn = allReturns.Any(r => r.RestorationOrderFk == order.Id);
-                if (!hasReturn) // только те, которые ещё не возвращены (на реставрации или ожидают возврата)
-                {
-                    var exhibit = allExhibits.FirstOrDefault(e => e.Id == order.ExhibitFk);
-                    var restorer = (await _exhibitRepo.GetAllAsync()).FirstOrDefault(); // заглушка, надо загружать отдельно
-                    result.Add(new RestorationExhibitDto
-                    {
-                        ExhibitTitle = exhibit?.Title ?? "?",
-                        OrderNumber = order.OrderNumber,
-                        ReceiptDate = order.ReceiptDate,
-                        PlannedCompletionDate = order.PlannedCompletionDate,
-                        RestorerName = "?", // нужно подтянуть имя реставратора отдельно
-                        Status = (!hasAct && !hasReturn) ? "В работе" : "Работы завершены, ожидает возврата"
-                    });
-                }
-            }
-            RestorationExhibits = new ObservableCollection<RestorationExhibitDto>(result);
+            // Экспонаты, у которых есть заказ, но нет акта завершения (в работе)
+            var activeOrderExhibitIds = allOrders
+                .Where(o => !allActs.Any(a => a.RestorationOrderFk == o.Id))
+                .Select(o => o.ExhibitFk)
+                .Distinct();
+
+            var exhibits = await _exhibitRepo.GetAllAsync();
+            var restorationExhibits = exhibits.Where(e => activeOrderExhibitIds.Contains(e.Id)).ToList();
+            RestorationExhibits = new ObservableCollection<Exhibit>(restorationExhibits);
         }
 
         [RelayCommand]
-        private async Task GenerateRestorationHistory()
+        private async Task LoadRestorationHistory()
         {
             if (SelectedExhibitForHistory == null)
             {
-                MessageBox.Show("Выберите экспонат.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Выберите экспонат.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            var orders = await _orderRepo.GetAllAsync();
-            var ordersForExhibit = orders.Where(o => o.ExhibitFk == SelectedExhibitForHistory.Id).ToList();
-            var acts = await _actRepo.GetAllAsync();
-            var returns = await _returnRepo.GetAllAsync();
-            var workLogs = await _workLogRepo.GetAllAsync();
-            var workTypes = await _workTypeRepo.GetAllAsync();
 
-            var history = new List<RestorationHistoryDto>();
+            var allOrders = await _orderRepo.GetAllAsync();
+            var ordersForExhibit = allOrders.Where(o => o.ExhibitFk == SelectedExhibitForHistory.Id).ToList();
+
+            var allActs = await _restorationActRepo.GetAllAsync();
+            var allReturns = await _returnActRepo.GetAllAsync();
+
+            var history = new List<RestorationHistoryRow>();
             foreach (var order in ordersForExhibit)
             {
-                var act = acts.FirstOrDefault(a => a.RestorationOrderFk == order.Id);
-                var returnAct = returns.FirstOrDefault(r => r.RestorationOrderFk == order.Id);
-                var logs = workLogs.Where(w => w.RestorationOrderFk == order.Id).ToList();
-                var descriptions = logs.Select(l => $"{l.ExecutionDate:dd.MM.yyyy} - {l.WorkTypeFkNavigation?.Title ?? l.WorkTypeFk.ToString()}").ToList();
-                history.Add(new RestorationHistoryDto
+                var act = allActs.FirstOrDefault(a => a.RestorationOrderFk == order.Id);
+                var returnAct = allReturns.FirstOrDefault(r => r.RestorationOrderFk == order.Id);
+                history.Add(new RestorationHistoryRow
                 {
                     OrderNumber = order.OrderNumber,
                     ReceiptDate = order.ReceiptDate,
+                    PlannedCompletionDate = order.PlannedCompletionDate,
                     CompletionDate = act?.CompletionDate,
                     ReturnDate = returnAct?.ReturnDate,
-                    FinalReport = act?.FinalReport,
-                    TotalCost = act?.TotalCost ?? 0,
-                    WorkLogDescriptions = descriptions
+                    Status = (act == null && returnAct == null) ? "В работе" :
+                             (act != null && returnAct == null) ? "Работы завершены, ожидает возврата" : "Закрыт"
                 });
             }
-            RestorationHistory = new ObservableCollection<RestorationHistoryDto>(history);
+
+            RestorationHistoryRows = new ObservableCollection<RestorationHistoryRow>(history);
         }
+    }
+
+    public class AttendanceReportRow
+    {
+        public string ExhibitionTitle { get; set; }
+        public int VisitorsCount { get; set; }
+        public double Revenue { get; set; }
+    }
+
+    public class RestorationHistoryRow
+    {
+        public string OrderNumber { get; set; }
+        public DateTime ReceiptDate { get; set; }
+        public DateTime PlannedCompletionDate { get; set; }
+        public DateTime? CompletionDate { get; set; }
+        public DateTime? ReturnDate { get; set; }
+        public string Status { get; set; }
     }
 }

@@ -19,10 +19,14 @@ namespace Museum
         {
             var services = new ServiceCollection();
 
-            // Регистрация DbContext
+            // Регистрация DbContext как Scoped (для репозиториев)
             services.AddDbContext<MuseumDbContext>(options =>
+                options.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"),
+                ServiceLifetime.Scoped);  // важно: Scoped, не Singleton
+
+            // Регистрация фабрики (для TicketSalesViewModel)
+            services.AddDbContextFactory<MuseumDbContext>(options =>
                 options.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"));
-            // Для работы в колледже: "Server=DBSRV\\vip2025;Database=бобор;Trusted_Connection=True;TrustServerCertificate=True;"
 
             // Репозитории
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));

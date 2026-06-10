@@ -11,13 +11,13 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <DatePicker SelectedDate="{Binding ReportStartDate}" Width="120" Margin="0,0,10,0"/>
-                    <DatePicker SelectedDate="{Binding ReportEndDate}" Width="120" Margin="0,0,10,0"/>
-                    <Button Content="Сформировать" Command="{Binding GenerateAttendanceReportCommand}" Width="100"/>
+                    <DatePicker SelectedDate="{Binding StartDate}" Margin="0,0,10,0"/>
+                    <DatePicker SelectedDate="{Binding EndDate}" Margin="0,0,10,0"/>
+                    <Button Content="Сформировать отчёт" Command="{Binding GenerateAttendanceReportCommand}" Width="150"/>
                 </StackPanel>
-                <DataGrid Grid.Row="2" ItemsSource="{Binding AttendanceReport}" AutoGenerateColumns="False" IsReadOnly="True">
+                <DataGrid Grid.Row="2" ItemsSource="{Binding AttendanceReportRows}" AutoGenerateColumns="False" IsReadOnly="True">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Выставка" Binding="{Binding ExhibitionTitle}" Width="*"/>
+                        <DataGridTextColumn Header="Выставка" Binding="{Binding ExhibitionTitle}" Width="200"/>
                         <DataGridTextColumn Header="Посетителей" Binding="{Binding VisitorsCount}" Width="100"/>
                         <DataGridTextColumn Header="Выручка" Binding="{Binding Revenue, StringFormat=C}" Width="120"/>
                     </DataGrid.Columns>
@@ -25,40 +25,19 @@
             </Grid>
         </TabItem>
 
-        <!-- Отчёт 2: Загрузка выставки по дням -->
-        <TabItem Header="Загрузка выставки по дням">
+        <!-- Отчёт 2: Экспонаты на реставрации -->
+        <TabItem Header="Экспонаты на реставрации">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <ComboBox ItemsSource="{Binding Exhibitions}" DisplayMemberPath="Title" 
-                              SelectedItem="{Binding SelectedExhibitionForDaily}" Width="200" Margin="0,0,10,0"/>
-                    <DatePicker SelectedDate="{Binding ReportStartDate}" Width="120" Margin="0,0,10,0"/>
-                    <DatePicker SelectedDate="{Binding ReportEndDate}" Width="120" Margin="0,0,10,0"/>
-                    <Button Content="Сформировать" Command="{Binding GenerateDailyAttendanceCommand}" Width="100"/>
-                </StackPanel>
-                <DataGrid Grid.Row="2" ItemsSource="{Binding DailyAttendanceReport}" AutoGenerateColumns="False" IsReadOnly="True">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Дата" Binding="{Binding VisitDate, StringFormat=dd.MM.yyyy}" Width="120"/>
-                        <DataGridTextColumn Header="Посетителей" Binding="{Binding VisitorsCount}" Width="100"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                <Button Content="Обновить" Command="{Binding LoadRestorationExhibitsCommand}" Width="100" Margin="0,0,0,10"/>
+                <DataGrid Grid.Row="1" ItemsSource="{Binding RestorationExhibits}" AutoGenerateColumns="True" IsReadOnly="True"/>
             </Grid>
         </TabItem>
 
-        <!-- Отчёт 3: Экспонаты на реставрации -->
-        <TabItem Header="Экспонаты на реставрации">
-            <Grid Margin="10">
-                <Button Content="Обновить" Command="{Binding GenerateRestorationExhibitsReportCommand}" 
-                        HorizontalAlignment="Right" Margin="0,0,0,10" Width="100"/>
-                <DataGrid ItemsSource="{Binding RestorationExhibits}" AutoGenerateColumns="True" IsReadOnly="True"/>
-            </Grid>
-        </TabItem>
-
-        <!-- Отчёт 4: История реставраций экспоната -->
+        <!-- Отчёт 3: История реставраций по экспонату -->
         <TabItem Header="История реставраций">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
@@ -66,19 +45,18 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <ComboBox ItemsSource="{Binding AllExhibits}" DisplayMemberPath="Title" 
+                    <ComboBox ItemsSource="{Binding AllExhibits}" DisplayMemberPath="Title"
                               SelectedItem="{Binding SelectedExhibitForHistory}" Width="250" Margin="0,0,10,0"/>
-                    <Button Content="Показать историю" Command="{Binding GenerateRestorationHistoryCommand}" Width="120"/>
+                    <Button Content="Показать историю" Command="{Binding LoadRestorationHistoryCommand}" Width="120"/>
                 </StackPanel>
-                <DataGrid Grid.Row="1" ItemsSource="{Binding RestorationHistory}" AutoGenerateColumns="False" IsReadOnly="True">
+                <DataGrid Grid.Row="1" ItemsSource="{Binding RestorationHistoryRows}" AutoGenerateColumns="False" IsReadOnly="True">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Номер заказа" Binding="{Binding OrderNumber}" Width="100"/>
+                        <DataGridTextColumn Header="№ заказа" Binding="{Binding OrderNumber}" Width="100"/>
                         <DataGridTextColumn Header="Дата приёма" Binding="{Binding ReceiptDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                        <DataGridTextColumn Header="Плановая дата" Binding="{Binding PlannedCompletionDate, StringFormat=dd.MM.yyyy}" Width="100"/>
                         <DataGridTextColumn Header="Дата завершения" Binding="{Binding CompletionDate, StringFormat=dd.MM.yyyy}" Width="100"/>
                         <DataGridTextColumn Header="Дата возврата" Binding="{Binding ReturnDate, StringFormat=dd.MM.yyyy}" Width="100"/>
-                        <DataGridTextColumn Header="Стоимость" Binding="{Binding TotalCost, StringFormat=C}" Width="80"/>
-                        <DataGridTextColumn Header="Отчёт" Binding="{Binding FinalReport}" Width="*"/>
-                        <!-- Журнал работ можно показать в отдельном столбце или через детализацию -->
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="180"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

@@ -1,19 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Museum.ViewModels;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace Museum.Views
 {
@@ -25,7 +12,14 @@ namespace Museum.Views
         public Reports()
         {
             InitializeComponent();
-            DataContext = App.ServiceProvider.GetRequiredService<ReportsViewModel>();
+            var vm = App.ServiceProvider.GetRequiredService<ReportsViewModel>();
+            DataContext = vm;
+            Loaded += async (s, e) =>
+            {
+                await vm.LoadExhibitionsAsync();
+                await vm.LoadAllExhibitsAsync();
+                await vm.LoadRestorationExhibitsAsync();
+            };
         }
     }
 }

@@ -6,18 +6,21 @@ namespace Museum.Views
 {
     public partial class TicketSales : UserControl
     {
-        private readonly TicketSalesViewModel _viewModel;
         public TicketSales()
         {
             InitializeComponent();
-            _viewModel = App.ServiceProvider.GetRequiredService<TicketSalesViewModel>();
-            DataContext = _viewModel;
-            Loaded += async (s, e) => await _viewModel.LoadExhibitionsAsync();
+            Loaded += async (s, e) =>
+            {
+                var vm = App.ServiceProvider.GetRequiredService<TicketSalesViewModel>();
+                DataContext = vm;
+                await vm.LoadExhibitionsAsync();
+            };
         }
 
         private async void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            await _viewModel.LoadTicketsForExhibitionCommand.ExecuteAsync(null);
+            if (DataContext is TicketSalesViewModel vm)
+                await vm.LoadTicketsForExhibition();
         }
     }
 }

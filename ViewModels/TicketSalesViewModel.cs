@@ -1,8 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Museum.Models;
-using Museum.Repository;
-using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
 
@@ -10,9 +9,7 @@ namespace Museum.ViewModels
 {
     public partial class TicketSalesViewModel : ObservableObject
     {
-        private readonly IRepository<Ticket> _ticketRepo;
-        private readonly IRepository<Exhibition> _exhibitionRepo;
-        private readonly IRepository<TicketStatus> _ticketStatusRepo;
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
 
         [ObservableProperty]
         private ObservableCollection<Exhibition> _exhibitions;
@@ -32,36 +29,32 @@ namespace Museum.ViewModels
         [ObservableProperty]
         private double _salePrice = 500;
 
-        public TicketSalesViewModel(
-            IRepository<Ticket> ticketRepo,
-            IRepository<Exhibition> exhibitionRepo,
-            IRepository<TicketStatus> ticketStatusRepo)
+        public TicketSalesViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
         {
-            _ticketRepo = ticketRepo;
-            _exhibitionRepo = exhibitionRepo;
-            _ticketStatusRepo = ticketStatusRepo;
+            _contextFactory = contextFactory;
         }
 
-        internal async Task LoadExhibitionsAsync()
+        public async Task LoadExhibitionsAsync()
         {
-            var list = await _exhibitionRepo.GetAllAsync();
-            System.Diagnostics.Debug.WriteLine($"Загружено выставок: {list.Count()}");
-            foreach (var ex in list)
-                System.Diagnostics.Debug.WriteLine($"  {ex.Id} - {ex.Title}");
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var list = await context.Exhibitions.ToListAsync();
             Exhibitions = new ObservableCollection<Exhibition>(list);
         }
 
         [RelayCommand]
-        private async Task LoadTicketsForExhibition()
+        internal async Task LoadTicketsForExhibition()
         {
             if (SelectedExhibition == null)
             {
                 TicketsForSelectedExhibition?.Clear();
                 return;
             }
-            var allTickets = await _ticketRepo.GetAllAsync();
-            var filtered = allTickets.Where(t => t.ExhibitionFk == SelectedExhibition.Id);
-            TicketsForSelectedExhibition = new ObservableCollection<Ticket>(filtered);
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var tickets = await context.Tickets
+                .Include(t => t.TicketStatusFkNavigation)
+                .Where(t => t.ExhibitionFk == SelectedExhibition.Id)
+                .ToListAsync();
+            TicketsForSelectedExhibition = new ObservableCollection<Ticket>(tickets);
         }
 
         [RelayCommand]
@@ -73,7 +66,8 @@ namespace Museum.ViewModels
                 return;
             }
 
-            var soldStatus = (await _ticketStatusRepo.GetAllAsync()).FirstOrDefault(s => s.Title == "Продан");
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var soldStatus = await context.TicketStatuses.FirstOrDefaultAsync(s => s.Title == "Продан");
             if (soldStatus == null)
             {
                 MessageBox.Show("Статус 'Продан' не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -90,8 +84,8 @@ namespace Museum.ViewModels
                 TicketStatusFk = soldStatus.Id
             };
 
-            await _ticketRepo.AddAsync(ticket);
-            await _ticketRepo.SaveAsync();
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
             await LoadTicketsForExhibition();
             MessageBox.Show($"Билет {ticket.TicketNumber} продан.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -104,22 +98,38 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите билет для отметки.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (SelectedTicket.TicketStatusFkNavigation?.Title == "Использован")
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var ticketFromDb = await context.Tickets
+                .Include(t => t.TicketStatusFkNavigation)
+                .FirstOrDefaultAsync(t => t.Id == SelectedTicket.Id);
+
+            if (ticketFromDb == null)
+            {
+                MessageBox.Show("Билет не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (ticketFromDb.TicketStatusFkNavigation?.Title == "Использован")
             {
                 MessageBox.Show("Билет уже использован.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var usedStatus = (await _ticketStatusRepo.GetAllAsync()).FirstOrDefault(s => s.Title == "Использован");
+            var usedStatus = await context.TicketStatuses.FirstOrDefaultAsync(s => s.Title == "Использован");
             if (usedStatus == null)
             {
                 MessageBox.Show("Статус 'Использован' не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
+            ticketFromDb.TicketStatusFk = usedStatus.Id;
+            await context.SaveChangesAsync();
+
+            // Обновляем локальный объект для UI
             SelectedTicket.TicketStatusFk = usedStatus.Id;
-            _ticketRepo.Update(SelectedTicket);
-            await _ticketRepo.SaveAsync();
+            SelectedTicket.TicketStatusFkNavigation = usedStatus;
+
             await LoadTicketsForExhibition();
             MessageBox.Show("Билет отмечен как использованный.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
         }
