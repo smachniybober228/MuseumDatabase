@@ -1,25 +1,16 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Museum.Models;
-using Museum.Repository;
 using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace Museum.ViewModels
 {
     public partial class RestorationViewModel : ObservableObject
     {
-        private readonly IRepository<RestorationOrderEntity> _orderRepo;
-        private readonly IRepository<Exhibit> _exhibitRepo;
-        private readonly IRepository<Person> _personRepo;
-        private readonly IRepository<RestorationWorkType> _workTypeRepo;
-        private readonly IRepository<RequiredWorkType> _requiredWorkRepo;
-        private readonly IRepository<WorkLogEntry> _workLogRepo;
-        private readonly IRepository<RestorationAct> _restorationActRepo;
-        private readonly IRepository<ReturnAct> _returnActRepo;
-        private readonly IRepository<ExhibitStatus> _exhibitStatusRepo;
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
 
         [ObservableProperty]
         private ObservableCollection<RestorationOrderEntity> _orders;
@@ -30,114 +21,80 @@ namespace Museum.ViewModels
         [ObservableProperty]
         private bool _isLoading;
 
-        public RestorationViewModel(
-            IRepository<RestorationOrderEntity> orderRepo,
-            IRepository<Exhibit> exhibitRepo,
-            IRepository<Person> personRepo,
-            IRepository<RestorationWorkType> workTypeRepo,
-            IRepository<RequiredWorkType> requiredWorkRepo,
-            IRepository<WorkLogEntry> workLogRepo,
-            IRepository<RestorationAct> restorationActRepo,
-            IRepository<ReturnAct> returnActRepo,
-            IRepository<ExhibitStatus> exhibitStatusRepo)
+        public RestorationViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
         {
-            _orderRepo = orderRepo;
-            _exhibitRepo = exhibitRepo;
-            _personRepo = personRepo;
-            _workTypeRepo = workTypeRepo;
-            _requiredWorkRepo = requiredWorkRepo;
-            _workLogRepo = workLogRepo;
-            _restorationActRepo = restorationActRepo;
-            _returnActRepo = returnActRepo;
-            _exhibitStatusRepo = exhibitStatusRepo;
+            _contextFactory = contextFactory;
             LoadOrdersAsync();
-        }
-
-        private async Task<bool> HasRestorationActAsync(int orderId)
-        {
-            var acts = await _restorationActRepo.GetAllAsync();
-            return acts.Any(a => a.RestorationOrderFk == orderId);
-        }
-
-        private async Task<bool> HasReturnActAsync(int orderId)
-        {
-            var returns = await _returnActRepo.GetAllAsync();
-            return returns.Any(r => r.RestorationOrderFk == orderId);
         }
 
         [RelayCommand]
         private async Task LoadOrdersAsync()
         {
             IsLoading = true;
-            var list = await _orderRepo.GetAllAsync();
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var orders = await context.RestorationOrderEntities
+                .Include(o => o.ExhibitFkNavigation)
+                .Include(o => o.RestorerFkNavigation)
+                .Include(o => o.InitiatorFkNavigation)
+                .Include(o => o.RequiredWorkTypes)
+                    .ThenInclude(r => r.WorkTypeFkNavigation)
+                .Include(o => o.RestorationActs)
+                .Include(o => o.ReturnActs)
+                .ToListAsync();
 
-            // Загружаем все акты и возвраты один раз
-            var allActs = await _restorationActRepo.GetAllAsync();
-            var allReturns = await _returnActRepo.GetAllAsync();
-
-            foreach (var order in list)
+            // Вычисляем статус для каждого заказа
+            foreach (var order in orders)
             {
-                bool hasAct = allActs.Any(a => a.RestorationOrderFk == order.Id);
-                bool hasReturn = allReturns.Any(r => r.RestorationOrderFk == order.Id);
-
-                if (!hasAct && !hasReturn)
-                    order.StatusText = "В работе";
-                else if (hasAct && !hasReturn)
-                    order.StatusText = "Работы завершены, ожидает возврата";
-                else
-                    order.StatusText = "Закрыт";
+                bool hasAct = order.RestorationActs.Any();
+                bool hasReturn = order.ReturnActs.Any();
+                order.StatusText = (!hasAct && !hasReturn) ? "В работе" :
+                                   (hasAct && !hasReturn) ? "Работы завершены, ожидает возврата" : "Закрыт";
             }
 
-            Orders = new ObservableCollection<RestorationOrderEntity>(list);
+            Orders = new ObservableCollection<RestorationOrderEntity>(orders);
             IsLoading = false;
         }
 
         [RelayCommand]
         private async Task AddOrderAsync()
         {
-            var exhibits = await _exhibitRepo.GetAllAsync();
-            // Получаем всех людей (или отфильтруйте по роли "Хранитель" через PersonRole)
-            var allPersons = await _personRepo.GetAllAsync();
-            var restorers = allPersons.ToList(); // для реставраторов лучше тоже фильтровать
-            var initiators = allPersons.ToList(); // инициаторы – хранители, упрощённо берём всех
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var exhibits = await context.Exhibits.ToListAsync();
+            var allPersons = await context.People.ToListAsync();
+            // Для простоты используем всех людей как реставраторов и инициаторов.
+            // В реальном приложении лучше фильтровать по ролям.
+            var restorers = allPersons;
+            var initiators = allPersons;
+            var workTypes = await context.RestorationWorkTypes.ToListAsync();
 
-            var workTypes = await _workTypeRepo.GetAllAsync();
-
-            var dialog = new RestorationOrderDialog(null, exhibits.ToList(), restorers, initiators, workTypes.ToList());
+            var dialog = new RestorationOrderDialog(null, exhibits, restorers, initiators, workTypes);
             if (dialog.ShowDialog() == true)
             {
                 var newOrder = dialog.Order;
                 newOrder.OrderNumber = GenerateOrderNumber();
-                await _orderRepo.AddAsync(newOrder);
-                await _orderRepo.SaveAsync();
+                context.RestorationOrderEntities.Add(newOrder);
+                await context.SaveChangesAsync();
 
                 // Сохраняем требуемые виды работ
-                foreach (var wt in dialog.SelectedWorkTypeIds)
+                foreach (var workTypeId in dialog.SelectedWorkTypeIds)
                 {
-                    var required = new RequiredWorkType
+                    context.RequiredWorkTypes.Add(new RequiredWorkType
                     {
                         RestorationOrderFk = newOrder.Id,
-                        WorkTypeFk = wt
-                    };
-                    await _requiredWorkRepo.AddAsync(required);
+                        WorkTypeFk = workTypeId
+                    });
                 }
-                await _requiredWorkRepo.SaveAsync();
 
                 // Меняем статус экспоната на "На реставрации"
-                var exhibit = await _exhibitRepo.GetByIdAsync(newOrder.ExhibitFk);
-                var statuses = await _exhibitStatusRepo.GetAllAsync();
-                var underRestorationStatus = statuses.FirstOrDefault(s => s.Title == "На реставрации");
-                if (underRestorationStatus == null)
-                {
-                    MessageBox.Show("Статус 'На реставрации' не найден.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                exhibit.ExhibitStatusFk = underRestorationStatus.Id;
-                _exhibitRepo.Update(exhibit);
-                await _exhibitRepo.SaveAsync();
+                var exhibit = await context.Exhibits.FindAsync(newOrder.ExhibitFk);
+                var underRestorationStatus = await context.ExhibitStatuses
+                    .FirstOrDefaultAsync(s => s.Title == "На реставрации");
+                if (underRestorationStatus != null)
+                    exhibit.ExhibitStatusFk = underRestorationStatus.Id;
 
+                await context.SaveChangesAsync();
                 await LoadOrdersAsync();
-                MessageBox.Show("Реставрационный заказ создан.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Реставрационный заказ создан.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -149,98 +106,100 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите заказ для редактирования.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (await HasRestorationActAsync(SelectedOrder.Id))
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+
+            // Загружаем заказ из БД с зависимостями (для отслеживания)
+            var orderToEdit = await context.RestorationOrderEntities
+                .Include(o => o.RequiredWorkTypes)
+                .FirstOrDefaultAsync(o => o.Id == SelectedOrder.Id);
+
+            if (orderToEdit == null) return;
+
+            // Проверяем, можно ли редактировать (заказ не завершён)
+            var hasAct = await context.RestorationActs.AnyAsync(a => a.RestorationOrderFk == orderToEdit.Id);
+            if (hasAct)
             {
                 MessageBox.Show("Нельзя редактировать завершённый заказ.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            var exhibits = await _exhibitRepo.GetAllAsync();
-            var restorers = await _personRepo.GetAllAsync();
-            var workTypes = await _workTypeRepo.GetAllAsync();
-            // Загружаем текущие требуемые виды работ
-            var allRequired = await _requiredWorkRepo.GetAllAsync();
-            var existingWorkTypeIds = allRequired.Where(r => r.RestorationOrderFk == SelectedOrder.Id).Select(r => r.WorkTypeFk).ToList();
+            // Загружаем данные для диалога
+            var exhibits = await context.Exhibits.ToListAsync();
+            var allPersons = await context.People.ToListAsync();
+            var workTypes = await context.RestorationWorkTypes.ToListAsync();
+            var existingWorkTypeIds = orderToEdit.RequiredWorkTypes.Select(r => r.WorkTypeFk).ToList();
 
-            var initiators = await _personRepo.GetAllAsync(); // или отфильтровать
-            var dialog = new RestorationOrderDialog(SelectedOrder, exhibits.ToList(), restorers.ToList(), initiators.ToList(), workTypes.ToList(), existingWorkTypeIds);
+            var dialog = new RestorationOrderDialog(orderToEdit, exhibits, allPersons, allPersons, workTypes, existingWorkTypeIds);
             if (dialog.ShowDialog() == true)
             {
-                // Обновляем основные поля
-                SelectedOrder.ExhibitFk = dialog.Order.ExhibitFk;
-                SelectedOrder.ReceiptDate = dialog.Order.ReceiptDate;
-                SelectedOrder.ReasonDirection = dialog.Order.ReasonDirection;
-                SelectedOrder.PlannedCompletionDate = dialog.Order.PlannedCompletionDate;
-                SelectedOrder.RestorerFk = dialog.Order.RestorerFk;
-                _orderRepo.Update(SelectedOrder);
+                // Обновляем поля заказа
+                orderToEdit.ExhibitFk = dialog.Order.ExhibitFk;
+                orderToEdit.ReceiptDate = dialog.Order.ReceiptDate;
+                orderToEdit.ReasonDirection = dialog.Order.ReasonDirection;
+                orderToEdit.PlannedCompletionDate = dialog.Order.PlannedCompletionDate;
+                orderToEdit.RestorerFk = dialog.Order.RestorerFk;
 
-                // Обновляем требуемые виды работ (удалить старые, добавить новые)
-                var toDelete = allRequired.Where(r => r.RestorationOrderFk == SelectedOrder.Id).ToList();
-                foreach (var del in toDelete)
-                    _requiredWorkRepo.Delete(del);
-                foreach (var wt in dialog.SelectedWorkTypeIds)
+                // Обновляем требуемые виды работ: удаляем старые, добавляем новые
+                context.RequiredWorkTypes.RemoveRange(orderToEdit.RequiredWorkTypes);
+                orderToEdit.RequiredWorkTypes.Clear();
+                foreach (var workTypeId in dialog.SelectedWorkTypeIds)
                 {
-                    var required = new RequiredWorkType
+                    orderToEdit.RequiredWorkTypes.Add(new RequiredWorkType
                     {
-                        RestorationOrderFk = SelectedOrder.Id,
-                        WorkTypeFk = wt
-                    };
-                    await _requiredWorkRepo.AddAsync(required);
+                        RestorationOrderFk = orderToEdit.Id,
+                        WorkTypeFk = workTypeId
+                    });
                 }
-                await _requiredWorkRepo.SaveAsync();
-                await _orderRepo.SaveAsync();
+
+                await context.SaveChangesAsync();
+
+                // Перезагружаем список заказов, чтобы обновить UI
                 await LoadOrdersAsync();
-                MessageBox.Show("Заказ обновлён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Заказ обновлён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
         [RelayCommand]
         private async Task DeleteOrderAsync()
         {
-            if(SelectedOrder == null)
-    {
+            if (SelectedOrder == null)
+            {
                 MessageBox.Show("Выберите заказ для удаления.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (await HasRestorationActAsync(SelectedOrder.Id) || await HasReturnActAsync(SelectedOrder.Id))
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+            // Загружаем заказ со всеми зависимостями
+            var order = await context.RestorationOrderEntities
+                .Include(o => o.RequiredWorkTypes)
+                .Include(o => o.WorkLogEntries)
+                .Include(o => o.RestorationActs)
+                .Include(o => o.ReturnActs)
+                .FirstOrDefaultAsync(o => o.Id == SelectedOrder.Id);
+
+            if (order == null) return;
+
+            // Нельзя удалять, если есть акты завершения или возврата
+            if (order.RestorationActs.Any() || order.ReturnActs.Any())
             {
                 MessageBox.Show("Нельзя удалить заказ, по которому уже есть акты.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            if (MessageBox.Show($"Удалить заказ {SelectedOrder.OrderNumber}?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+
+            if (MessageBox.Show($"Удалить заказ {order.OrderNumber}?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                // Удаляем связанные записи
-                var allRequired = await _requiredWorkRepo.GetAllAsync();
-                var toDeleteRequired = allRequired.Where(r => r.RestorationOrderFk == SelectedOrder.Id).ToList();
-                foreach (var req in toDeleteRequired)
-                    _requiredWorkRepo.Delete(req);
-
-                var allWorkLogs = await _workLogRepo.GetAllAsync();
-                var toDeleteLogs = allWorkLogs.Where(w => w.RestorationOrderFk == SelectedOrder.Id).ToList();
-                foreach (var log in toDeleteLogs)
-                    _workLogRepo.Delete(log);
-
-                // Также, если есть акты (хотя проверка выше должна была их отсечь), но на всякий случай:
-                var allActs = await _restorationActRepo.GetAllAsync();
-                var toDeleteActs = allActs.Where(a => a.RestorationOrderFk == SelectedOrder.Id).ToList();
-                foreach (var act in toDeleteActs)
-                    _restorationActRepo.Delete(act);
-
-                var allReturns = await _returnActRepo.GetAllAsync();
-                var toDeleteReturns = allReturns.Where(r => r.RestorationOrderFk == SelectedOrder.Id).ToList();
-                foreach (var ret in toDeleteReturns)
-                    _returnActRepo.Delete(ret);
-
-                // Сохраняем удаление зависимостей
-                await _requiredWorkRepo.SaveAsync();
-                await _workLogRepo.SaveAsync();
-                await _restorationActRepo.SaveAsync();
-                await _returnActRepo.SaveAsync();
+                // Удаляем все зависимые записи
+                context.RequiredWorkTypes.RemoveRange(order.RequiredWorkTypes);
+                context.WorkLogEntries.RemoveRange(order.WorkLogEntries);
+                await context.SaveChangesAsync(); // Сохраняем удаление зависимостей
 
                 // Теперь удаляем сам заказ
-                _orderRepo.Delete(SelectedOrder);
-                await _orderRepo.SaveAsync();
+                context.RestorationOrderEntities.Remove(order);
+                await context.SaveChangesAsync();
+
                 await LoadOrdersAsync();
+                MessageBox.Show("Заказ удалён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -252,11 +211,15 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите заказ для просмотра журнала работ.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            var workLogs = await _workLogRepo.GetAllAsync();
-            var logsForOrder = workLogs.Where(w => w.RestorationOrderFk == SelectedOrder.Id).ToList();
-            var workTypes = await _workTypeRepo.GetAllAsync();
 
-            var dialog = new WorkLogWindow(SelectedOrder, logsForOrder, workTypes.ToList(), _workLogRepo);
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var logs = await context.WorkLogEntries
+                .Include(w => w.WorkTypeFkNavigation)
+                .Where(w => w.RestorationOrderFk == SelectedOrder.Id)
+                .ToListAsync();
+            var workTypes = await context.RestorationWorkTypes.ToListAsync();
+
+            var dialog = new WorkLogWindow(SelectedOrder, logs, workTypes, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
                 await LoadOrdersAsync();
@@ -271,11 +234,15 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите заказ для завершения.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (await HasRestorationActAsync(SelectedOrder.Id))
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var hasAct = await context.RestorationActs.AnyAsync(a => a.RestorationOrderFk == SelectedOrder.Id);
+            if (hasAct)
             {
                 MessageBox.Show("Заказ уже завершён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
+
             var dialog = new CompleteOrderDialog(SelectedOrder);
             if (dialog.ShowDialog() == true)
             {
@@ -286,10 +253,10 @@ namespace Museum.ViewModels
                     FinalReport = dialog.FinalReport,
                     TotalCost = dialog.TotalCost
                 };
-                await _restorationActRepo.AddAsync(act);
-                await _restorationActRepo.SaveAsync();
+                context.RestorationActs.Add(act);
+                await context.SaveChangesAsync();
                 await LoadOrdersAsync();
-                MessageBox.Show("Заказ завершён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Заказ завершён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -301,22 +268,27 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите заказ для возврата экспоната.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (!await HasRestorationActAsync(SelectedOrder.Id))
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var hasAct = await context.RestorationActs.AnyAsync(a => a.RestorationOrderFk == SelectedOrder.Id);
+            if (!hasAct)
             {
                 MessageBox.Show("Сначала завершите работы по заказу.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            if (await HasReturnActAsync(SelectedOrder.Id))
+
+            var hasReturn = await context.ReturnActs.AnyAsync(r => r.RestorationOrderFk == SelectedOrder.Id);
+            if (hasReturn)
             {
                 MessageBox.Show("Экспонат уже возвращён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            // Получаем возможные статусы для возврата (В запасниках, В основном фонде, В постоянной экспозиции)
-            var statuses = await _exhibitStatusRepo.GetAllAsync();
-            var availableStatuses = statuses.Where(s => s.Title == "В запасниках" || s.Title == "В основном фонде" || s.Title == "В постоянной экспозиции").ToList();
+            var statuses = await context.ExhibitStatuses
+                .Where(s => s.Title == "В запасниках" || s.Title == "В основном фонде" || s.Title == "В постоянной экспозиции")
+                .ToListAsync();
 
-            var dialog = new ReturnExhibitDialog(SelectedOrder, availableStatuses);
+            var dialog = new ReturnExhibitDialog(SelectedOrder, statuses);
             if (dialog.ShowDialog() == true)
             {
                 var returnAct = new ReturnAct
@@ -324,21 +296,19 @@ namespace Museum.ViewModels
                     RestorationOrderFk = SelectedOrder.Id,
                     ReturnDate = dialog.ReturnDate
                 };
-                await _returnActRepo.AddAsync(returnAct);
-                // Обновляем статус экспоната
-                var exhibit = await _exhibitRepo.GetByIdAsync(SelectedOrder.ExhibitFk);
-                exhibit.ExhibitStatusFk = dialog.SelectedStatusId;
-                _exhibitRepo.Update(exhibit);
-                await _exhibitRepo.SaveAsync();
-                await _returnActRepo.SaveAsync();
+                context.ReturnActs.Add(returnAct);
+
+                var exhibit = await context.Exhibits.FindAsync(SelectedOrder.ExhibitFk);
+                if (exhibit != null)
+                    exhibit.ExhibitStatusFk = dialog.SelectedStatusId;
+
+                await context.SaveChangesAsync();
                 await LoadOrdersAsync();
-                MessageBox.Show("Экспонат возвращён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Экспонат возвращён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
-        private string GenerateOrderNumber()
-        {
-            return $"R-{DateTime.Now:yyyyMMddHHmmss}";
-        }
+        private string GenerateOrderNumber() =>
+            $"R-{DateTime.Now:yyyyMMddHHmmss}";
     }
 }

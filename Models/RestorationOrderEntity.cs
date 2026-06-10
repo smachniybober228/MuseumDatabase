@@ -35,7 +35,4 @@ public partial class RestorationOrderEntity
     public virtual ICollection<ReturnAct> ReturnActs { get; set; } = new List<ReturnAct>();
 
     public virtual ICollection<WorkLogEntry> WorkLogEntries { get; set; } = new List<WorkLogEntry>();
-
-    [NotMapped]
-    public string StatusText { get; set; }
 }

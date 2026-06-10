@@ -1,13 +1,12 @@
 ﻿<UserControl x:Class="Museum.Views.Restoration"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Museum.ViewModels">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+
         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
             <Button Content="Новый заказ" Command="{Binding AddOrderCommand}" Margin="0,0,5,0"/>
             <Button Content="Редактировать" Command="{Binding EditOrderCommand}" Margin="0,0,5,0"/>
@@ -17,11 +16,24 @@
             <Button Content="Вернуть экспонат" Command="{Binding ReturnExhibitCommand}" Margin="0,0,5,0"/>
             <Button Content="Обновить" Command="{Binding LoadOrdersCommand}"/>
         </StackPanel>
-        <DataGrid Grid.Row="2" ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}" 
-                  AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False">
-            <!--<DataGrid.Columns>
-                <DataGridTextColumn Header="Статус" Binding="{Binding StatusText}" IsReadOnly="True"/>
-            </DataGrid.Columns>-->
+
+        <DataGrid Grid.Row="1" 
+                  ItemsSource="{Binding Orders}" 
+                  SelectedItem="{Binding SelectedOrder}"
+                  AutoGenerateColumns="False" 
+                  IsReadOnly="True" 
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="№ заказа" Binding="{Binding OrderNumber}" Width="120"/>
+                <DataGridTextColumn Header="Экспонат" Binding="{Binding ExhibitTitle}" Width="200"/>
+                <DataGridTextColumn Header="Дата приёма" Binding="{Binding ReceiptDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                <DataGridTextColumn Header="Плановая дата" Binding="{Binding PlannedCompletionDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                <DataGridTextColumn Header="Причина" Binding="{Binding ReasonDirection}" Width="150"/>
+                <DataGridTextColumn Header="Реставратор" Binding="{Binding RestorerName}" Width="150"/>
+                <DataGridTextColumn Header="Инициатор" Binding="{Binding InitiatorName}" Width="150"/>
+                <DataGridTextColumn Header="Требуемые работы" Binding="{Binding RequiredWorksString}" Width="200"/>
+                <DataGridTextColumn Header="Статус" Binding="{Binding StatusText}" Width="180"/>
+            </DataGrid.Columns>
         </DataGrid>
     </Grid>
 </UserControl>

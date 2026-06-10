@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Museum.Models;
-using Museum.Repository;
 using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -10,13 +10,7 @@ namespace Museum.ViewModels
 {
     public partial class ExhibitionsViewModel : ObservableObject
     {
-        private readonly IRepository<Exhibition> _exhibitionRepo;
-        private readonly IRepository<Hall> _hallRepo;
-        private readonly IRepository<Person> _personRepo;
-        private readonly IRepository<ExhibitionStatus> _statusRepo;
-        private readonly IRepository<Exhibit> _exhibitRepo;
-        private readonly IRepository<ExpositionPlaceType> _placeTypeRepo;
-        private readonly IRepository<ExhibitOnExhibition> _exhibitOnExhibitionRepo;
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
 
         [ObservableProperty]
         private ObservableCollection<Exhibition> _exhibitions;
@@ -27,23 +21,9 @@ namespace Museum.ViewModels
         [ObservableProperty]
         private bool _isLoading;
 
-        public ExhibitionsViewModel(
-            IRepository<Exhibition> exhibitionRepo,
-            IRepository<Hall> hallRepo,
-            IRepository<Person> personRepo,
-            IRepository<ExhibitionStatus> statusRepo,
-            IRepository<Exhibit> exhibitRepo,
-            IRepository<ExpositionPlaceType> placeTypeRepo,
-            IRepository<ExhibitOnExhibition> exhibitOnExhibitionRepo)
+        public ExhibitionsViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
         {
-            _exhibitionRepo = exhibitionRepo;
-            _hallRepo = hallRepo;
-            _personRepo = personRepo;
-            _statusRepo = statusRepo;
-            _exhibitRepo = exhibitRepo;
-            _placeTypeRepo = placeTypeRepo;
-            _exhibitOnExhibitionRepo = exhibitOnExhibitionRepo;
-
+            _contextFactory = contextFactory;
             LoadExhibitionsAsync();
         }
 
@@ -51,7 +31,14 @@ namespace Museum.ViewModels
         private async Task LoadExhibitionsAsync()
         {
             IsLoading = true;
-            var list = await _exhibitionRepo.GetAllAsync();
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var list = await context.Exhibitions
+                .Include(e => e.HallFkNavigation)
+                .Include(e => e.ResponsibleCuratorFkNavigation)
+                .Include(e => e.ExhibitionStatusFkNavigation)
+                .Include(e => e.ExhibitOnExhibitions)
+                    .ThenInclude(eoe => eoe.ExhibitFkNavigation)
+                .ToListAsync();
             Exhibitions = new ObservableCollection<Exhibition>(list);
             IsLoading = false;
         }
@@ -64,16 +51,14 @@ namespace Museum.ViewModels
                 StartDate = DateTime.Today,
                 EndDate = DateTime.Today.AddMonths(1)
             };
-            var halls = await _hallRepo.GetAllAsync();
-            var curators = await _personRepo.GetAllAsync();
-            var statuses = await _statusRepo.GetAllAsync();
-
-            var dialog = new ExhibitionEditWindow(newExhibition, halls, curators, statuses);
+            var dialog = new ExhibitionEditWindow(newExhibition, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                await _exhibitionRepo.AddAsync(dialog.EditedExhibition);
-                await _exhibitionRepo.SaveAsync();
+                using var context = await _contextFactory.CreateDbContextAsync();
+                context.Exhibitions.Add(dialog.EditedExhibition);
+                await context.SaveChangesAsync();
                 await LoadExhibitionsAsync();
+                MessageBox.Show("Выставка добавлена.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -86,34 +71,23 @@ namespace Museum.ViewModels
                 return;
             }
 
-            var copy = new Exhibition
-            {
-                Id = SelectedExhibition.Id,
-                Title = SelectedExhibition.Title,
-                StartDate = SelectedExhibition.StartDate,
-                EndDate = SelectedExhibition.EndDate,
-                HallFk = SelectedExhibition.HallFk,
-                ResponsibleCuratorFk = SelectedExhibition.ResponsibleCuratorFk,
-                ExhibitionStatusFk = SelectedExhibition.ExhibitionStatusFk
-            };
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var exhibitionFromDb = await context.Exhibitions
+                .Include(e => e.HallFkNavigation)
+                .Include(e => e.ResponsibleCuratorFkNavigation)
+                .Include(e => e.ExhibitionStatusFkNavigation)
+                .Include(e => e.ExhibitOnExhibitions)
+                    .ThenInclude(eoe => eoe.ExhibitFkNavigation)
+                .FirstOrDefaultAsync(e => e.Id == SelectedExhibition.Id);
 
-            var halls = await _hallRepo.GetAllAsync();
-            var curators = await _personRepo.GetAllAsync();
-            var statuses = await _statusRepo.GetAllAsync();
+            if (exhibitionFromDb == null) return;
 
-            var dialog = new ExhibitionEditWindow(copy, halls, curators, statuses);
+            var dialog = new ExhibitionEditWindow(exhibitionFromDb, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                SelectedExhibition.Title = copy.Title;
-                SelectedExhibition.StartDate = copy.StartDate;
-                SelectedExhibition.EndDate = copy.EndDate;
-                SelectedExhibition.HallFk = copy.HallFk;
-                SelectedExhibition.ResponsibleCuratorFk = copy.ResponsibleCuratorFk;
-                SelectedExhibition.ExhibitionStatusFk = copy.ExhibitionStatusFk;
-
-                _exhibitionRepo.Update(SelectedExhibition);
-                await _exhibitionRepo.SaveAsync();
+                await context.SaveChangesAsync();
                 await LoadExhibitionsAsync();
+                MessageBox.Show("Выставка обновлена.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -126,12 +100,17 @@ namespace Museum.ViewModels
                 return;
             }
 
-            if (MessageBox.Show($"Удалить выставку '{SelectedExhibition.Title}'? Все связанные билеты и экспонаты на выставке будут удалены.",
-                "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (MessageBox.Show($"Удалить выставку '{SelectedExhibition.Title}'? Все связанные билеты и экспонаты на выставке будут удалены.", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                _exhibitionRepo.Delete(SelectedExhibition);
-                await _exhibitionRepo.SaveAsync();
-                await LoadExhibitionsAsync();
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var exhibition = await context.Exhibitions.FindAsync(SelectedExhibition.Id);
+                if (exhibition != null)
+                {
+                    context.Exhibitions.Remove(exhibition);
+                    await context.SaveChangesAsync();
+                    await LoadExhibitionsAsync();
+                    MessageBox.Show("Выставка удалена.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
         }
 
@@ -144,40 +123,38 @@ namespace Museum.ViewModels
                 return;
             }
 
-            // Загружаем все существующие связи для этой выставки (без трекинга, чтобы избежать конфликтов)
-            var allLinks = await _exhibitOnExhibitionRepo.GetAllAsync();
-            var existingLinks = allLinks.Where(l => l.ExhibitionFk == SelectedExhibition.Id).ToList();
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var exhibition = await context.Exhibitions
+                .Include(e => e.ExhibitOnExhibitions)
+                .FirstOrDefaultAsync(e => e.Id == SelectedExhibition.Id);
 
-            var allExhibits = await _exhibitRepo.GetAllAsync();
-            var placeTypes = await _placeTypeRepo.GetAllAsync();
+            var allExhibits = await context.Exhibits.ToListAsync();
+            var placeTypes = await context.ExpositionPlaceTypes.ToListAsync();
 
-            var dialog = new ExhibitSelectionWindow(SelectedExhibition, existingLinks, allExhibits.ToList(), placeTypes.ToList());
+            var existingLinks = exhibition?.ExhibitOnExhibitions?.ToList() ?? new List<ExhibitOnExhibition>();
+
+            var dialog = new ExhibitSelectionWindow(exhibition, existingLinks, allExhibits, placeTypes);
             if (dialog.ShowDialog() == true)
             {
-                // Удаляем все существующие связи для этой выставки (если они есть)
-                foreach (var link in existingLinks)
+                // Обновляем связи: удаляем старые, добавляем новые
+                if (exhibition != null)
                 {
-                    _exhibitOnExhibitionRepo.Delete(link);
-                }
-                await _exhibitOnExhibitionRepo.SaveAsync();
-
-                // Добавляем новые связи из диалога
-                foreach (var link in dialog.UpdatedLinks)
-                {
-                    var newLink = new ExhibitOnExhibition
+                    context.ExhibitOnExhibitions.RemoveRange(existingLinks);
+                    foreach (var link in dialog.UpdatedLinks)
                     {
-                        ExhibitionFk = SelectedExhibition.Id,
-                        ExhibitFk = link.ExhibitFk,
-                        ExpositionPlaceTypeFk = link.ExpositionPlaceTypeFk,
-                        PlaceIdentifier = link.PlaceIdentifier,
-                        LabelData = link.LabelData
-                    };
-                    await _exhibitOnExhibitionRepo.AddAsync(newLink);
+                        context.ExhibitOnExhibitions.Add(new ExhibitOnExhibition
+                        {
+                            ExhibitionFk = exhibition.Id,
+                            ExhibitFk = link.ExhibitFk,
+                            ExpositionPlaceTypeFk = link.ExpositionPlaceTypeFk,
+                            PlaceIdentifier = link.PlaceIdentifier,
+                            LabelData = link.LabelData
+                        });
+                    }
+                    await context.SaveChangesAsync();
+                    MessageBox.Show("Состав выставки обновлён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                    await LoadExhibitionsAsync();
                 }
-                await _exhibitOnExhibitionRepo.SaveAsync();
-
-                MessageBox.Show("Состав выставки обновлён.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-                await LoadExhibitionsAsync();
             }
         }
     }
