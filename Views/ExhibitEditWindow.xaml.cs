@@ -1,41 +1,35 @@
-﻿using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
+﻿using Microsoft.EntityFrameworkCore;
 using Museum.Models;
 using Museum.Repository;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
 
 namespace Museum.Views
 {
     public partial class ExhibitEditWindow : Window
     {
         public Exhibit EditedExhibit { get; private set; }
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
+        private List<ExhibitStatus> _statuses;
+        private List<ReceiptAct> _receiptActs;
 
-        private readonly IRepository<ExhibitStatus> _statusRepo;
-        private readonly IRepository<ReceiptAct> _receiptActRepo;
-        private ObservableCollection<ExhibitStatus> _statuses;
-        private ObservableCollection<ReceiptAct> _receiptActs;
 
         public ExhibitEditWindow(Exhibit exhibit,
-                                 IRepository<ExhibitStatus> statusRepo,
-                                 IRepository<ReceiptAct> receiptActRepo)
+                                 IDbContextFactory<MuseumDbContext> contextFactory)
         {
             InitializeComponent();
-            EditedExhibit = exhibit;
-            _statusRepo = statusRepo;
-            _receiptActRepo = receiptActRepo;
-            Loaded += async (s, e) =>
-            {
-                // Небольшая задержка, чтобы UI успел отрисоваться
-                await Task.Delay(10);
-                await LoadDataAsync();
-            };
+            _contextFactory = contextFactory;
+            EditedExhibit = exhibit ?? new Exhibit();
+            Loaded += async (s, e) => await LoadDataAsync();
             DataContext = this;
         }
 
         private async Task LoadDataAsync()
         {
-            _statuses = new ObservableCollection<ExhibitStatus>(await _statusRepo.GetAllAsync());
-            _receiptActs = new ObservableCollection<ReceiptAct>(await _receiptActRepo.GetAllAsync());
+            using var context = await _contextFactory.CreateDbContextAsync();
+            _statuses = await context.ExhibitStatuses.ToListAsync();
+            _receiptActs = await context.ReceiptActs.ToListAsync();
 
             if (cmbStatus != null)
             {
@@ -69,7 +63,7 @@ namespace Museum.Views
 
         // Поля для привязки в XAML
         public Exhibit ExhibitData => EditedExhibit;
-        public ObservableCollection<ExhibitStatus> Statuses => _statuses;
-        public ObservableCollection<ReceiptAct> ReceiptActs => _receiptActs;
+        public List<ExhibitStatus> Statuses => _statuses;
+        public List<ReceiptAct> ReceiptActs => _receiptActs;
     }
 }

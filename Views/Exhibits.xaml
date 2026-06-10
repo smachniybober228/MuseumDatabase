@@ -1,12 +1,7 @@
 ﻿<UserControl x:Class="Museum.Views.Exhibits"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:Museum.Views"
-             xmlns:helpers="clr-namespace:Museum.Helpers"
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+             xmlns:helpers="clr-namespace:Museum.Helpers">
     <UserControl.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
     </UserControl.Resources>
@@ -14,28 +9,51 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
-            <Button Content="Загрузить" Command="{Binding LoadExhibitsCommand}" Margin="0,0,5,0"/>
             <Button Content="Добавить" Command="{Binding AddExhibitCommand}" Margin="0,0,5,0"/>
             <Button Content="Редактировать" Command="{Binding EditExhibitCommand}" Margin="0,0,5,0"/>
-            <Button Content="Удалить" Command="{Binding DeleteExhibitCommand}"/>
+            <Button Content="Удалить" Command="{Binding DeleteExhibitCommand}" Margin="0,0,5,0"/>
+            <Button Content="Обновить" Command="{Binding LoadExhibitsCommand}"/>
         </StackPanel>
 
         <DataGrid Grid.Row="1" 
                   ItemsSource="{Binding Exhibits}" 
                   SelectedItem="{Binding SelectedExhibit}"
-                  AutoGenerateColumns="True" 
+                  AutoGenerateColumns="False" 
                   IsReadOnly="True"
-                  CanUserAddRows="False"
-                  SelectionMode="Single"/>
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <!-- Инвентарный номер -->
+                <DataGridTextColumn Header="Инв. номер" Binding="{Binding InventoryNumber}" Width="100"/>
+                <!-- Название -->
+                <DataGridTextColumn Header="Название" Binding="{Binding Title}" Width="200"/>
+                <!-- Размеры -->
+                <DataGridTextColumn Header="Длина (см)" Binding="{Binding LengthCm}" Width="80"/>
+                <DataGridTextColumn Header="Ширина (см)" Binding="{Binding WidthCm}" Width="80"/>
+                <DataGridTextColumn Header="Высота (см)" Binding="{Binding HeightCm}" Width="80"/>
+                <!-- Дата создания -->
+                <DataGridTextColumn Header="Дата создания" Binding="{Binding CreationDate}" Width="120"/>
+                <!-- Автор -->
+                <DataGridTextColumn Header="Автор" Binding="{Binding Author}" Width="150"/>
+                <!-- Место происхождения -->
+                <DataGridTextColumn Header="Место происхождения" Binding="{Binding OriginPlace}" Width="150"/>
+                <!-- Статус (берём Title из навигационного свойства) -->
+                <DataGridTextColumn Header="Статус" Binding="{Binding ExhibitStatusFkNavigation.Title}" Width="120"/>
+                <!--Акт поступления-->
+                <DataGridTextColumn Header="Акт поступления" Binding="{Binding ReceiptActFkNavigation.ActDate, StringFormat=dd.MM.yyyy}" Width="100"/>
+                <!-- Категории (список через запятую) -->
+                <DataGridTextColumn Header="Категории" Binding="{Binding CategoriesString}" Width="150"/>
+                <!-- Материалы (список через запятую) -->
+                <DataGridTextColumn Header="Материалы" Binding="{Binding MaterialsString}" Width="150"/>
+                <!-- Техники (список через запятую) -->
+                <DataGridTextColumn Header="Техники" Binding="{Binding TechniquesString}" Width="150"/>
+            </DataGrid.Columns>
+        </DataGrid>
 
-        <Border Grid.Row="1" 
-                Background="White" 
-                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}"
-                HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <Border Grid.Row="1" Background="White" 
+                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="Загрузка..." HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
         </Border>
     </Grid>

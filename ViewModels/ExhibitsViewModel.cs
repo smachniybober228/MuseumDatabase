@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Museum.Models;
-using Museum.Repository;
 using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -10,9 +10,7 @@ namespace Museum.ViewModels
 {
     public partial class ExhibitsViewModel : ObservableObject
     {
-        private readonly IRepository<Exhibit> _exhibitRepository;
-        private readonly IRepository<ExhibitStatus> _statusRepository;
-        private readonly IRepository<ReceiptAct> _receiptActRepository;
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
 
         [ObservableProperty]
         private ObservableCollection<Exhibit> _exhibits;
@@ -23,13 +21,9 @@ namespace Museum.ViewModels
         [ObservableProperty]
         private bool _isLoading;
 
-        public ExhibitsViewModel(IRepository<Exhibit> exhibitRepository,
-                                 IRepository<ExhibitStatus> statusRepository,
-                                 IRepository<ReceiptAct> receiptActRepository)
+        public ExhibitsViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
         {
-            _exhibitRepository = exhibitRepository;
-            _statusRepository = statusRepository;
-            _receiptActRepository = receiptActRepository;
+            _contextFactory = contextFactory;
             LoadExhibitsAsync();
         }
 
@@ -37,7 +31,17 @@ namespace Museum.ViewModels
         private async Task LoadExhibitsAsync()
         {
             IsLoading = true;
-            var list = await _exhibitRepository.GetAllAsync();
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var list = await context.Exhibits
+                .Include(e => e.ExhibitStatusFkNavigation)
+                .Include(e => e.ReceiptActFkNavigation)
+                .Include(e => e.ExhibitCategories)
+                    .ThenInclude(ec => ec.CategoryFkNavigation)
+                .Include(e => e.ExhibitMaterials)
+                    .ThenInclude(em => em.MaterialFkNavigation)
+                .Include(e => e.ExhibitTechniques)
+                    .ThenInclude(et => et.TechniqueFkNavigation)
+                .ToListAsync();
             Exhibits = new ObservableCollection<Exhibit>(list);
             IsLoading = false;
         }
@@ -45,13 +49,14 @@ namespace Museum.ViewModels
         [RelayCommand]
         private async Task AddExhibitAsync()
         {
-            var newExhibit = new Exhibit();
-            var dialog = new ExhibitEditWindow(newExhibit, _statusRepository, _receiptActRepository);
+            var dialog = new ExhibitEditWindow(null, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                await _exhibitRepository.AddAsync(dialog.EditedExhibit);
-                await _exhibitRepository.SaveAsync();
+                using var context = await _contextFactory.CreateDbContextAsync();
+                context.Exhibits.Add(dialog.EditedExhibit);
+                await context.SaveChangesAsync();
                 await LoadExhibitsAsync();
+                MessageBox.Show("Экспонат добавлен.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -63,40 +68,28 @@ namespace Museum.ViewModels
                 MessageBox.Show("Выберите экспонат для редактирования.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            // Создаём копию для редактирования, чтобы не портить оригинал при отмене
-            var copy = new Exhibit
-            {
-                Id = SelectedExhibit.Id,
-                InventoryNumber = SelectedExhibit.InventoryNumber,
-                Title = SelectedExhibit.Title,
-                LengthCm = SelectedExhibit.LengthCm,
-                WidthCm = SelectedExhibit.WidthCm,
-                HeightCm = SelectedExhibit.HeightCm,
-                CreationDate = SelectedExhibit.CreationDate,
-                Author = SelectedExhibit.Author,
-                OriginPlace = SelectedExhibit.OriginPlace,
-                ExhibitStatusFk = SelectedExhibit.ExhibitStatusFk,
-                ReceiptActFk = SelectedExhibit.ReceiptActFk
-            };
 
-            var dialog = new ExhibitEditWindow(copy, _statusRepository, _receiptActRepository);
+            // Загружаем свежую копию из БД, чтобы избежать конфликта отслеживания
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var exhibitFromDb = await context.Exhibits
+                .Include(e => e.ExhibitStatusFkNavigation)
+                .Include(e => e.ReceiptActFkNavigation)
+                .Include(e => e.ExhibitCategories)
+                    .ThenInclude(ec => ec.CategoryFkNavigation)
+                .Include(e => e.ExhibitMaterials)
+                    .ThenInclude(em => em.MaterialFkNavigation)
+                .Include(e => e.ExhibitTechniques)
+                    .ThenInclude(et => et.TechniqueFkNavigation)
+                .FirstOrDefaultAsync(e => e.Id == SelectedExhibit.Id);
+
+            if (exhibitFromDb == null) return;
+
+            var dialog = new ExhibitEditWindow(exhibitFromDb, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                // Копируем изменённые данные обратно в оригинал
-                SelectedExhibit.InventoryNumber = copy.InventoryNumber;
-                SelectedExhibit.Title = copy.Title;
-                SelectedExhibit.LengthCm = copy.LengthCm;
-                SelectedExhibit.WidthCm = copy.WidthCm;
-                SelectedExhibit.HeightCm = copy.HeightCm;
-                SelectedExhibit.CreationDate = copy.CreationDate;
-                SelectedExhibit.Author = copy.Author;
-                SelectedExhibit.OriginPlace = copy.OriginPlace;
-                SelectedExhibit.ExhibitStatusFk = copy.ExhibitStatusFk;
-                SelectedExhibit.ReceiptActFk = copy.ReceiptActFk;
-
-                _exhibitRepository.Update(SelectedExhibit);
-                await _exhibitRepository.SaveAsync();
+                await context.SaveChangesAsync();
                 await LoadExhibitsAsync();
+                MessageBox.Show("Экспонат обновлён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -105,15 +98,20 @@ namespace Museum.ViewModels
         {
             if (SelectedExhibit == null)
             {
-                MessageBox.Show("Выберите экспонат для удаления.", "Предупреждение");
+                MessageBox.Show("Выберите экспонат для удаления.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (MessageBox.Show($"Удалить экспонат '{SelectedExhibit.Title}'? Все связанные данные (фото, категории, заказы и т.д.) будут удалены автоматически.",
-                        "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (MessageBox.Show($"Удалить экспонат '{SelectedExhibit.Title}'? Все связанные данные будут удалены.", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                _exhibitRepository.Delete(SelectedExhibit);
-                await _exhibitRepository.SaveAsync();
-                await LoadExhibitsAsync();
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var exhibit = await context.Exhibits.FindAsync(SelectedExhibit.Id);
+                if (exhibit != null)
+                {
+                    context.Exhibits.Remove(exhibit);
+                    await context.SaveChangesAsync();
+                    await LoadExhibitsAsync();
+                    MessageBox.Show("Экспонат удалён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
         }
     }
