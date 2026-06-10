@@ -6,183 +6,170 @@ using Museum.Views;
 using System.Collections.ObjectModel;
 using System.Windows;
 
-public partial class PeopleViewModel : ObservableObject
+namespace Museum.ViewModels
 {
-    private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
-
-    [ObservableProperty]
-    private ObservableCollection<Person> _people;
-
-    [ObservableProperty]
-    private Person _selectedPerson;
-
-    [ObservableProperty]
-    private bool _isLoading;
-
-    public PeopleViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
+    public partial class PeopleViewModel : ObservableObject
     {
-        _contextFactory = contextFactory;
-    }
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
 
-    public async Task LoadPeopleAsync()
-    {
-        IsLoading = true;
-        using var context = await _contextFactory.CreateDbContextAsync();
-        var list = await context.People
-            .Include(p => p.PersonRoles)
-            .ThenInclude(pr => pr.RoleFkNavigation)
-            .ToListAsync();
-        People = new ObservableCollection<Person>(list);
-        IsLoading = false;
-    }
+        [ObservableProperty]
+        private ObservableCollection<Person> _people;
 
-    [RelayCommand]
-    private async Task AddPersonAsync()
-    {
-        var personTypes = await GetPersonTypesAsync();
-        var roles = await GetRolesAsync();
+        [ObservableProperty]
+        private Person _selectedPerson;
 
-        var dialog = new PersonEditDialog(new Person(), personTypes, roles);
-        if (dialog.ShowDialog() == true)
+        [ObservableProperty]
+        private bool _isLoading;
+
+        public PeopleViewModel(IDbContextFactory<MuseumDbContext> contextFactory)
+        {
+            _contextFactory = contextFactory;
+        }
+
+        public async Task LoadPeopleAsync()
+        {
+            IsLoading = true;
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var list = await context.People
+                .Include(p => p.PersonTypeFkNavigation)
+                .Include(p => p.PersonRoles)
+                    .ThenInclude(pr => pr.RoleFkNavigation)
+                .ToListAsync();
+            People = new ObservableCollection<Person>(list);
+            IsLoading = false;
+        }
+
+        [RelayCommand]
+        private async Task AddPersonAsync()
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var newPerson = dialog.EditedPerson;
-            context.People.Add(newPerson);
-            await context.SaveChangesAsync();
-
-            // Сохраняем роли
-            foreach (var roleId in dialog.SelectedRoleIds)
+            var personTypes = await context.PersonTypes.ToListAsync();
+            var roles = await context.RoleEntities.ToListAsync();
+            var dialog = new PersonEditDialog(null, personTypes, roles);
+            if (dialog.ShowDialog() == true)
             {
-                context.PersonRoles.Add(new PersonRole { PersonFk = newPerson.Id, RoleFk = roleId });
+                var newPerson = dialog.EditedPerson;
+                context.People.Add(newPerson);
+                await context.SaveChangesAsync();
+
+                foreach (var roleId in dialog.SelectedRoleIds)
+                {
+                    context.PersonRoles.Add(new PersonRole { PersonFk = newPerson.Id, RoleFk = roleId });
+                }
+                await context.SaveChangesAsync();
+                await LoadPeopleAsync();
+                MessageBox.Show("Человек добавлен.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            await context.SaveChangesAsync();
-
-            await LoadPeopleAsync();
-            MessageBox.Show("Человек добавлен.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-    }
-
-    [RelayCommand]
-    private async Task EditPersonAsync()
-    {
-        if (SelectedPerson == null)
-        {
-            MessageBox.Show("Выберите человека для редактирования.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
         }
 
-        var personTypes = await GetPersonTypesAsync();
-        var roles = await GetRolesAsync();
-
-        using var context = await _contextFactory.CreateDbContextAsync();
-        // Загружаем человека с его текущими ролями из БД (отдельный экземпляр, не SelectedPerson)
-        var personFromDb = await context.People
-            .Include(p => p.PersonRoles)
-            .FirstOrDefaultAsync(p => p.Id == SelectedPerson.Id);
-
-        if (personFromDb == null) return;
-
-        var existingRoleIds = personFromDb.PersonRoles.Select(pr => pr.RoleFk).ToList();
-
-        var dialog = new PersonEditDialog(personFromDb, personTypes, roles, existingRoleIds);
-        if (dialog.ShowDialog() == true)
+        [RelayCommand]
+        private async Task EditPersonAsync()
         {
-            // Обновляем поля
-            personFromDb.FullName = dialog.EditedPerson.FullName;
-            personFromDb.PersonTypeFk = dialog.EditedPerson.PersonTypeFk;
-            personFromDb.ContactPhone = dialog.EditedPerson.ContactPhone;
-            personFromDb.ContactEmail = dialog.EditedPerson.ContactEmail;
-
-            // Обновляем роли: удаляем старые, добавляем новые
-            context.PersonRoles.RemoveRange(personFromDb.PersonRoles);
-            foreach (var roleId in dialog.SelectedRoleIds)
+            if (SelectedPerson == null)
             {
-                context.PersonRoles.Add(new PersonRole { PersonFk = personFromDb.Id, RoleFk = roleId });
+                MessageBox.Show("Выберите человека для редактирования.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
 
-            await context.SaveChangesAsync();
-            await LoadPeopleAsync();
-            MessageBox.Show("Данные обновлены.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var personFromDb = await context.People
+                .Include(p => p.PersonRoles)
+                .FirstOrDefaultAsync(p => p.Id == SelectedPerson.Id);
+            if (personFromDb == null) return;
+
+            var personTypes = await context.PersonTypes.ToListAsync();
+            var roles = await context.RoleEntities.ToListAsync();
+            var existingRoleIds = personFromDb.PersonRoles.Select(pr => pr.RoleFk).ToList();
+
+            var dialog = new PersonEditDialog(personFromDb, personTypes, roles, existingRoleIds);
+            if (dialog.ShowDialog() == true)
+            {
+                personFromDb.FullName = dialog.EditedPerson.FullName;
+                personFromDb.PersonTypeFk = dialog.EditedPerson.PersonTypeFk;
+                personFromDb.ContactPhone = dialog.EditedPerson.ContactPhone;
+                personFromDb.ContactEmail = dialog.EditedPerson.ContactEmail;
+
+                // Обновляем роли
+                context.PersonRoles.RemoveRange(personFromDb.PersonRoles);
+                foreach (var roleId in dialog.SelectedRoleIds)
+                {
+                    context.PersonRoles.Add(new PersonRole { PersonFk = personFromDb.Id, RoleFk = roleId });
+                }
+                await context.SaveChangesAsync();
+                await LoadPeopleAsync();
+                MessageBox.Show("Данные обновлены.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
-    }
 
-    [RelayCommand]
-    private async Task DeletePersonAsync()
-    {
-        if (SelectedPerson == null)
+        [RelayCommand]
+        private async Task DeletePersonAsync()
         {
-            MessageBox.Show("Выберите человека для удаления.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+            if (SelectedPerson == null) return;
+            if (MessageBox.Show($"Удалить '{SelectedPerson.FullName}'? Все связанные данные будут удалены.", "Подтверждение", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                return;
 
-        if (MessageBox.Show($"Удалить '{SelectedPerson.FullName}'? Все связанные данные будут удалены.", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-            return;
+            using var context = await _contextFactory.CreateDbContextAsync();
 
-        using var context = await _contextFactory.CreateDbContextAsync();
-        // Загружаем человека со всеми зависимостями, которые могут блокировать удаление
-        var person = await context.People
-            .Include(p => p.PersonRoles)
-            .Include(p => p.ReceiptActSourceFkNavigations)
-                .ThenInclude(act => act.Exhibits)   // чтобы загрузить экспонаты актов
-            .Include(p => p.ReceiptActResponsiblePersonFkNavigations)
-                .ThenInclude(act => act.Exhibits)
-            .Include(p => p.Exhibitions)            // где он куратор
-            .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
-                .ThenInclude(o => o.RequiredWorkTypes)
-            .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
-                .ThenInclude(o => o.WorkLogEntries)
-            .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
-                .ThenInclude(o => o.RestorationActs)
-            .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
-                .ThenInclude(o => o.ReturnActs)
-            .Include(p => p.RestorationOrderEntityInitiatorFkNavigations)
-                .ThenInclude(o => o.RequiredWorkTypes)
-            .Include(p => p.RestorationOrderEntityInitiatorFkNavigations)
-                .ThenInclude(o => o.WorkLogEntries)
-            .FirstOrDefaultAsync(p => p.Id == SelectedPerson.Id);
+            // Загружаем человека со всеми зависимостями
+            var person = await context.People
+                .Include(p => p.PersonRoles)
+                .Include(p => p.ReceiptActSourceFkNavigations)
+                    .ThenInclude(act => act.Exhibits) // загружаем экспонаты, привязанные к актам
+                .Include(p => p.ReceiptActResponsiblePersonFkNavigations)
+                    .ThenInclude(act => act.Exhibits)
+                .Include(p => p.Exhibitions)
+                .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
+                    .ThenInclude(o => o.RequiredWorkTypes)
+                .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
+                    .ThenInclude(o => o.WorkLogEntries)
+                .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
+                    .ThenInclude(o => o.RestorationActs)
+                .Include(p => p.RestorationOrderEntityRestorerFkNavigations)
+                    .ThenInclude(o => o.ReturnActs)
+                .Include(p => p.RestorationOrderEntityInitiatorFkNavigations)
+                    .ThenInclude(o => o.RequiredWorkTypes)
+                .Include(p => p.RestorationOrderEntityInitiatorFkNavigations)
+                    .ThenInclude(o => o.WorkLogEntries)
+                .FirstOrDefaultAsync(p => p.Id == SelectedPerson.Id);
 
-        if (person != null)
-        {
-            // 1. Удаляем экспонаты, привязанные к актам поступления (чтобы не было конфликта с ReceiptActFk)
-            var exhibitsToDelete = person.ReceiptActSourceFkNavigations
-                .SelectMany(act => act.Exhibits)
-                .Concat(person.ReceiptActResponsiblePersonFkNavigations.SelectMany(act => act.Exhibits))
-                .Distinct()
-                .ToList();
-            context.Exhibits.RemoveRange(exhibitsToDelete);
+            if (person == null) return;
 
-            // 2. Удаляем сами акты поступления
-            context.ReceiptActs.RemoveRange(person.ReceiptActSourceFkNavigations);
-            context.ReceiptActs.RemoveRange(person.ReceiptActResponsiblePersonFkNavigations);
-
-            // 3. Удаляем реставрационные заказы (и всё, что на них ссылается, удалится по каскаду)
-            context.RestorationOrderEntities.RemoveRange(person.RestorationOrderEntityRestorerFkNavigations);
-            context.RestorationOrderEntities.RemoveRange(person.RestorationOrderEntityInitiatorFkNavigations);
-
-            // 4. Удаляем выставки, где он куратор
-            context.Exhibitions.RemoveRange(person.Exhibitions);
-
-            // 5. Удаляем роли
+            // 1. Удаляем роли
             context.PersonRoles.RemoveRange(person.PersonRoles);
 
-            // 6. Удаляем самого человека
+            // 2. Удаляем реставрационные заказы (где человек реставратор или инициатор)
+            var orders = person.RestorationOrderEntityRestorerFkNavigations
+                .Concat(person.RestorationOrderEntityInitiatorFkNavigations)
+                .ToList();
+            foreach (var order in orders)
+            {
+                context.RequiredWorkTypes.RemoveRange(order.RequiredWorkTypes);
+                context.WorkLogEntries.RemoveRange(order.WorkLogEntries);
+                context.RestorationActs.RemoveRange(order.RestorationActs);
+                context.ReturnActs.RemoveRange(order.ReturnActs);
+                context.RestorationOrderEntities.Remove(order);
+            }
+
+            // 3. Удаляем выставки, где человек – куратор
+            context.Exhibitions.RemoveRange(person.Exhibitions);
+
+            // 4. Удаляем акты поступления (и связанные с ними экспонаты)
+            var acts = person.ReceiptActSourceFkNavigations
+                .Concat(person.ReceiptActResponsiblePersonFkNavigations)
+                .ToList();
+            foreach (var act in acts)
+            {
+                // удаляем экспонаты, связанные с этим актом
+                context.Exhibits.RemoveRange(act.Exhibits);
+                context.ReceiptActs.Remove(act);
+            }
+
+            // 5. Удаляем самого человека
             context.People.Remove(person);
 
             await context.SaveChangesAsync();
             await LoadPeopleAsync();
             MessageBox.Show("Запись удалена.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-    }
-
-    private async Task<List<PersonType>> GetPersonTypesAsync()
-    {
-        using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.PersonTypes.ToListAsync();
-    }
-
-    private async Task<List<RoleEntity>> GetRolesAsync()
-    {
-        using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.RoleEntities.ToListAsync();
     }
 }

@@ -13,6 +13,14 @@
             <Button Content="Обновить" Command="{Binding LoadPeopleCommand}"/>
         </StackPanel>
         <DataGrid Grid.Row="1" ItemsSource="{Binding People}" SelectedItem="{Binding SelectedPerson}"
-                  AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"/>
+                  AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Полное имя" Binding="{Binding FullName}" Width="200"/>
+                <DataGridTextColumn Header="Тип лица" Binding="{Binding PersonTypeName}" Width="120"/>
+                <DataGridTextColumn Header="Телефон" Binding="{Binding ContactPhone}" Width="150"/>
+                <DataGridTextColumn Header="Email" Binding="{Binding ContactEmail}" Width="200"/>
+                <DataGridTextColumn Header="Роли" Binding="{Binding RolesString}" Width="250"/>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </UserControl>
