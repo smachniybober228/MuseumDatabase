@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Museum.Models;
 using Museum.Repository;
 using System.Collections.ObjectModel;
@@ -9,6 +10,8 @@ namespace Museum.ViewModels
 {
     public partial class ReportsViewModel : ObservableObject
     {
+        private readonly IDbContextFactory<MuseumDbContext> _contextFactory;
+
         private readonly IRepository<Ticket> _ticketRepo;
         private readonly IRepository<Exhibition> _exhibitionRepo;
         private readonly IRepository<RestorationOrderEntity> _orderRepo;
@@ -49,7 +52,8 @@ namespace Museum.ViewModels
             IRepository<RestorationOrderEntity> orderRepo,
             IRepository<Exhibit> exhibitRepo,
             IRepository<RestorationAct> restorationActRepo,
-            IRepository<ReturnAct> returnActRepo)
+            IRepository<ReturnAct> returnActRepo,
+            IDbContextFactory<MuseumDbContext> contextFactory)
         {
             _ticketRepo = ticketRepo;
             _exhibitionRepo = exhibitionRepo;
@@ -57,6 +61,7 @@ namespace Museum.ViewModels
             _exhibitRepo = exhibitRepo;
             _restorationActRepo = restorationActRepo;
             _returnActRepo = returnActRepo;
+            _contextFactory = contextFactory;
         }
 
         public async Task LoadExhibitionsAsync()
@@ -80,14 +85,21 @@ namespace Museum.ViewModels
                 return;
             }
 
-            var allTickets = await _ticketRepo.GetAllAsync();
-            var usedTickets = allTickets.Where(t => t.TicketStatusFkNavigation?.Title == "Использован" && t.VisitDate >= StartDate && t.VisitDate <= EndDate);
-            var grouped = usedTickets.GroupBy(t => t.ExhibitionFkNavigation).Select(g => new AttendanceReportRow
-            {
-                ExhibitionTitle = g.Key?.Title ?? "Неизвестная выставка",
-                VisitorsCount = g.Count(),
-                Revenue = g.Sum(t => t.SalePrice)
-            }).ToList();
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var usedTickets = await context.Tickets
+                .Include(t => t.TicketStatusFkNavigation)
+                .Include(t => t.ExhibitionFkNavigation)
+                .Where(t => t.TicketStatusFkNavigation.Title == "Использован" && t.VisitDate >= StartDate && t.VisitDate <= EndDate)
+                .ToListAsync();
+
+            var grouped = usedTickets
+                .GroupBy(t => t.ExhibitionFkNavigation?.Title ?? "Неизвестная выставка")
+                .Select(g => new AttendanceReportRow
+                {
+                    ExhibitionTitle = g.Key,
+                    VisitorsCount = g.Count(),
+                    Revenue = g.Sum(t => t.SalePrice)
+                }).ToList();
 
             AttendanceReportRows = new ObservableCollection<AttendanceReportRow>(grouped);
         }
