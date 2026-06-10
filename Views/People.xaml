@@ -1,0 +1,18 @@
+﻿<UserControl x:Class="Museum.Views.People"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="Добавить" Command="{Binding AddPersonCommand}" Margin="0,0,5,0"/>
+            <Button Content="Редактировать" Command="{Binding EditPersonCommand}" Margin="0,0,5,0"/>
+            <Button Content="Удалить" Command="{Binding DeletePersonCommand}" Margin="0,0,5,0"/>
+            <Button Content="Обновить" Command="{Binding LoadPeopleCommand}"/>
+        </StackPanel>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding People}" SelectedItem="{Binding SelectedPerson}"
+                  AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"/>
+    </Grid>
+</UserControl>

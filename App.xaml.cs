@@ -33,7 +33,10 @@ namespace Museum
             services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
             services.AddScoped<IRepository<Hall>, Repository<Hall>>();
             services.AddScoped<IRepository<Person>, Repository<Person>>();
+            services.AddScoped<IRepository<RoleEntity>, Repository<RoleEntity>>();
+            services.AddScoped<IRepository<PersonRole>, Repository<PersonRole>>();
             services.AddScoped<IRepository<ExhibitionStatus>, Repository<ExhibitionStatus>>();
+            services.AddScoped<IRepository<PersonType>, Repository<PersonType>>();
             services.AddScoped<IRepository<ExpositionPlaceType>, Repository<ExpositionPlaceType>>();
             services.AddScoped<IRepository<ExhibitOnExhibition>, Repository<ExhibitOnExhibition>>();
             services.AddScoped<IRepository<RestorationOrderEntity>, Repository<RestorationOrderEntity>>();
@@ -43,9 +46,7 @@ namespace Museum
             services.AddScoped<IRepository<RestorationAct>, Repository<RestorationAct>>();
             services.AddScoped<IRepository<ReturnAct>, Repository<ReturnAct>>();
             services.AddScoped<IRepository<Ticket>, Repository<Ticket>>();
-            services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
             services.AddScoped<IRepository<TicketStatus>, Repository<TicketStatus>>();
-            services.AddScoped<IRepository<Exhibition>, Repository<Exhibition>>();
             services.AddScoped<IRepository<Exhibit>, Repository<Exhibit>>();
 
             // ViewModels
@@ -55,6 +56,7 @@ namespace Museum
             services.AddTransient<RestorationViewModel>();
             services.AddTransient<TicketSalesViewModel>();
             services.AddTransient<ReportsViewModel>();
+            services.AddTransient<PeopleViewModel>();
 
             // Views
             services.AddTransient<Exhibits>();
@@ -62,6 +64,7 @@ namespace Museum
             services.AddTransient<Restoration>();
             services.AddTransient<TicketSales>();
             services.AddTransient<Reports>();
+            services.AddTransient<People>();
 
             ServiceProvider = services.BuildServiceProvider();
 

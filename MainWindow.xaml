@@ -28,6 +28,9 @@
             <TabItem Header="Отчёты">
                 <views:Reports/>
             </TabItem>
+            <TabItem Header="Люди">
+                <views:People/>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>
