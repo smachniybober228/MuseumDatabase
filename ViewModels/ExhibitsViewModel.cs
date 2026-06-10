@@ -52,9 +52,6 @@ namespace Museum.ViewModels
             var dialog = new ExhibitEditWindow(null, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
-                context.Exhibits.Add(dialog.EditedExhibit);
-                await context.SaveChangesAsync();
                 await LoadExhibitsAsync();
                 MessageBox.Show("Экспонат добавлен.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -69,7 +66,6 @@ namespace Museum.ViewModels
                 return;
             }
 
-            // Загружаем свежую копию из БД, чтобы избежать конфликта отслеживания
             using var context = await _contextFactory.CreateDbContextAsync();
             var exhibitFromDb = await context.Exhibits
                 .Include(e => e.ExhibitStatusFkNavigation)
@@ -87,7 +83,6 @@ namespace Museum.ViewModels
             var dialog = new ExhibitEditWindow(exhibitFromDb, _contextFactory);
             if (dialog.ShowDialog() == true)
             {
-                await context.SaveChangesAsync();
                 await LoadExhibitsAsync();
                 MessageBox.Show("Экспонат обновлён.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
             }
